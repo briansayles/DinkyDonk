@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import "./App.css";
 
 const tabs = ["Timer", "Tournament", "Players", "Settings"];
@@ -19,8 +20,126 @@ const defaultTimerSettings = {
   volume: 1,
   spokenAnnouncementEnabled: true,
   announcement:
-    "Dinky Dawnk. Dinky to the Donkey. The blinds are up bitches. The blinds are now {smallBlind} and {bigBlind}{antePhrase}.",
+    "The blinds are now {smallBlind} and {bigBlind}{antePhrase}.",
 };
+
+function normalizeTimerSettings(settings) {
+  return {
+    alarmSound: alarmSoundOptions.includes(settings?.alarmSound)
+      ? settings.alarmSound
+      : defaultTimerSettings.alarmSound,
+    volume:
+      typeof settings?.volume === "number" && Number.isFinite(settings.volume)
+        ? Math.max(0, Math.min(1, settings.volume))
+        : defaultTimerSettings.volume,
+    spokenAnnouncementEnabled:
+      typeof settings?.spokenAnnouncementEnabled === "boolean"
+        ? settings.spokenAnnouncementEnabled
+        : defaultTimerSettings.spokenAnnouncementEnabled,
+    announcement:
+      typeof settings?.announcement === "string"
+        ? settings.announcement
+        : defaultTimerSettings.announcement,
+  };
+}
+
+function TimerChip({ chip, onAnimationEnd }) {
+  const chipRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const element = chipRef.current;
+    if (!element) {
+      return;
+    }
+
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const diameter = entry.contentRect.width;
+      const text = element.textContent ?? "";
+      const fontFamily = window.getComputedStyle(element).fontFamily;
+      const referenceSize = 100;
+      context.font = `700 ${referenceSize}px ${fontFamily}`;
+      const textWidth = context.measureText(text).width;
+      if (textWidth === 0 || diameter === 0) {
+        return;
+      }
+
+      const maxFontSize = diameter * 0.28;
+      const fontSize = Math.min(maxFontSize, (diameter * 0.7 * referenceSize) / textWidth);
+      element.style.fontSize = `${fontSize}px`;
+    });
+
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, [chip.denomination]);
+
+  return (
+    <div
+      ref={chipRef}
+      className={[
+        "timer-chip",
+        chip.isColoringUp && !chip.isExiting
+          ? "timer-chip-coloring-up"
+          : "",
+        chip.isEntering ? "timer-chip-entering" : "",
+        chip.isExiting ? "timer-chip-removing" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ "--chip-color": chip.color }}
+      onAnimationEnd={(event) => onAnimationEnd(chip.key, event.animationName)}
+      role="img"
+      aria-hidden={chip.isExiting}
+      aria-label={`${formatChipNumber(chip.denomination)} chip`}
+    >
+      {formatChipNumber(chip.denomination)}
+    </div>
+  );
+}
+
+function TimerClock({ remainingMs }) {
+  const clockRef = useRef(null);
+  const text = formatClock(remainingMs);
+
+  useLayoutEffect(() => {
+    const element = clockRef.current;
+    const container = element?.closest(".timer-clock-area");
+    const context = document.createElement("canvas").getContext("2d");
+    if (!element || !container || !context) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const circleDiameter =
+        element.parentElement?.getBoundingClientRect().width ?? 0;
+      const availableWidth = container.clientWidth;
+      const fontFamily = window.getComputedStyle(element).fontFamily;
+      const referenceSize = 100;
+      context.font = `700 ${referenceSize}px ${fontFamily}`;
+      const textWidth = context.measureText(text).width;
+      if (circleDiameter > 0 && availableWidth > 0 && textWidth > 0) {
+        const fontSize = Math.min(
+          circleDiameter * 0.4725,
+          (availableWidth * 0.9 * referenceSize) / textWidth,
+        );
+        element.style.fontSize = `${fontSize}px`;
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [text]);
+
+  return (
+    <p ref={clockRef} className="timer-clock" aria-live="off">
+      {text}
+    </p>
+  );
+}
 
 function createEmptyLevel() {
   return {
@@ -188,7 +307,7 @@ function getChipsInUse(chips, levels, currentLevelIndex) {
       ...chip,
       isColoringUp: colorUpLevels.get(chip) === currentLevelIndex,
     }))
-    .slice(0, 4);
+    .slice(0, 5);
 }
 
 function sortLevels(levels) {
@@ -301,6 +420,26 @@ function TimerIcon({ name }) {
           <path d="m6 6 8 6-8 6z" fill="currentColor" />
         </>
       )}
+      {name === "fullscreen" && (
+        <path
+          d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {name === "exit-fullscreen" && (
+        <path
+          d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
     </svg>
   );
 }
@@ -323,11 +462,34 @@ function App() {
   const [timerSettings, setTimerSettings] = useState(defaultTimerSettings);
   const [timerSettingsLoaded, setTimerSettingsLoaded] = useState(false);
   const [timerSettingsError, setTimerSettingsError] = useState("");
+  const [settingsDirectory, setSettingsDirectory] = useState("");
+  const [changingSettingsDirectory, setChangingSettingsDirectory] = useState(false);
+  const [timerFullscreenError, setTimerFullscreenError] = useState("");
+  const [timerIsFullscreen, setTimerIsFullscreen] = useState(false);
+  const [entryCountDrafts, setEntryCountDrafts] = useState({});
+  const [payoutPlaceDrafts, setPayoutPlaceDrafts] = useState({});
+  const [payoutDrafts, setPayoutDrafts] = useState({});
+  const timerPanelRef = useRef(null);
+  const fullscreenExitInProgressRef = useRef(false);
+  const fullscreenExitTimerRef = useRef(null);
   const audioContextRef = useRef(null);
   const previousLevelRef = useRef(null);
 
   useEffect(() => {
     let active = true;
+
+    invoke("get_settings_directory")
+      .then((directory) => {
+        if (active) {
+          setSettingsDirectory(directory);
+        }
+      })
+      .catch((error) => {
+        console.error("Could not load settings directory.", error);
+        if (active) {
+          setTimerSettingsError("Settings directory could not be loaded.");
+        }
+      });
 
     invoke("load_tournaments")
       .then((savedTournaments) => {
@@ -364,35 +526,39 @@ function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem(timerSettingsStorageKey);
-      if (savedSettings) {
-        const parsedSettings = JSON.parse(savedSettings);
-        setTimerSettings({
-          alarmSound: alarmSoundOptions.includes(parsedSettings.alarmSound)
-            ? parsedSettings.alarmSound
-            : defaultTimerSettings.alarmSound,
-          volume:
-            typeof parsedSettings.volume === "number" &&
-            Number.isFinite(parsedSettings.volume)
-              ? Math.max(0, Math.min(1, parsedSettings.volume))
-              : defaultTimerSettings.volume,
-          spokenAnnouncementEnabled:
-            typeof parsedSettings.spokenAnnouncementEnabled === "boolean"
-              ? parsedSettings.spokenAnnouncementEnabled
-              : defaultTimerSettings.spokenAnnouncementEnabled,
-          announcement:
-            typeof parsedSettings.announcement === "string"
-              ? parsedSettings.announcement
-              : defaultTimerSettings.announcement,
-        });
-      }
-    } catch (error) {
-      console.error("Could not load timer settings.", error);
-      setTimerSettingsError("Timer settings could not be loaded.");
-    } finally {
-      setTimerSettingsLoaded(true);
-    }
+    let active = true;
+
+    invoke("load_timer_settings")
+      .then((savedSettings) => {
+        if (!active) {
+          return;
+        }
+
+        if (savedSettings) {
+          setTimerSettings(normalizeTimerSettings(savedSettings));
+          return;
+        }
+
+        const legacySettings = localStorage.getItem(timerSettingsStorageKey);
+        if (legacySettings) {
+          setTimerSettings(normalizeTimerSettings(JSON.parse(legacySettings)));
+        }
+      })
+      .catch((error) => {
+        console.error("Could not load timer settings.", error);
+        if (active) {
+          setTimerSettingsError("Timer settings could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setTimerSettingsLoaded(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -400,17 +566,60 @@ function App() {
       return;
     }
 
+    invoke("save_timer_settings", { settings: timerSettings })
+      .then(() => setTimerSettingsError(""))
+      .catch((error) => {
+        console.error("Could not save timer settings.", error);
+        setTimerSettingsError("Timer settings could not be saved.");
+      });
+  }, [timerSettings, timerSettingsLoaded]);
+
+  async function changeSettingsDirectory() {
     try {
-      localStorage.setItem(
-        timerSettingsStorageKey,
-        JSON.stringify(timerSettings),
+      const selectedDirectory = await open({
+        directory: true,
+        multiple: false,
+        title: "Choose settings directory",
+      });
+      if (!selectedDirectory) {
+        return;
+      }
+
+      setChangingSettingsDirectory(true);
+      await invoke("save_timer_settings", { settings: timerSettings });
+      const directory = await invoke("set_settings_directory", {
+        path: selectedDirectory,
+      });
+      setSettingsDirectory(directory);
+      const [savedTournaments, savedTimerSettings] = await Promise.all([
+        invoke("load_tournaments"),
+        invoke("load_timer_settings"),
+      ]);
+
+      setTournaments(
+        savedTournaments.tournaments.map((tournament) => ({
+          ...tournament,
+          chips: sortChips(tournament.chips ?? []),
+          levels: sortLevels(tournament.levels),
+        })),
       );
+      setActiveTournamentId(savedTournaments.activeTournamentId);
+      setExpandedTournaments(
+        savedTournaments.activeTournamentId
+          ? { [savedTournaments.activeTournamentId]: true }
+          : {},
+      );
+      if (savedTimerSettings) {
+        setTimerSettings(normalizeTimerSettings(savedTimerSettings));
+      }
       setTimerSettingsError("");
     } catch (error) {
-      console.error("Could not save timer settings.", error);
-      setTimerSettingsError("Timer settings could not be saved.");
+      console.error("Could not change settings directory.", error);
+      setTimerSettingsError("Settings directory could not be changed.");
+    } finally {
+      setChangingSettingsDirectory(false);
     }
-  }, [timerSettings, timerSettingsLoaded]);
+  }
 
   function startNewTournament() {
     setEditingId(null);
@@ -422,8 +631,10 @@ function App() {
       buyinCost: "",
       buyinDescription: "",
       rebuyCost: "",
+      rebuyChipstack: "",
       rebuyDescription: "",
       addonCost: "",
+      addonChipstack: "",
       addonDescription: "",
       chips: [],
       levels: [createEmptyLevel()],
@@ -440,8 +651,10 @@ function App() {
       buyinCost: tournament.buyinCost ?? "",
       buyinDescription: tournament.buyinDescription ?? "",
       rebuyCost: tournament.rebuyCost ?? "",
+      rebuyChipstack: tournament.rebuyChipstack ?? "",
       rebuyDescription: tournament.rebuyDescription ?? "",
       addonCost: tournament.addonCost ?? "",
+      addonChipstack: tournament.addonChipstack ?? "",
       addonDescription: tournament.addonDescription ?? "",
       chips: sortChips(
         (tournament.chips ?? []).map((chip) => ({
@@ -577,6 +790,9 @@ function App() {
 
   async function saveTournament(event) {
     event.preventDefault();
+    const existingTournament = editingId
+      ? tournaments.find((item) => item.id === editingId)
+      : null;
     const tournament = {
       id: editingId ?? crypto.randomUUID(),
       name: draft.name.trim(),
@@ -587,9 +803,21 @@ function App() {
       buyinCost: draft.buyinCost === "" ? null : Number(draft.buyinCost),
       buyinDescription: draft.buyinDescription.trim() || null,
       rebuyCost: draft.rebuyCost === "" ? null : Number(draft.rebuyCost),
+      rebuyChipstack:
+        draft.rebuyChipstack === "" ? null : Number(draft.rebuyChipstack),
       rebuyDescription: draft.rebuyDescription.trim() || null,
       addonCost: draft.addonCost === "" ? null : Number(draft.addonCost),
+      addonChipstack:
+        draft.addonChipstack === "" ? null : Number(draft.addonChipstack),
       addonDescription: draft.addonDescription.trim() || null,
+      buyinCount: existingTournament?.buyinCount ?? 0,
+      rebuyCount: existingTournament?.rebuyCount ?? 0,
+      addonCount: existingTournament?.addonCount ?? 0,
+      otherPrizePool: existingTournament?.otherPrizePool ?? 0,
+      otherChipstack: existingTournament?.otherChipstack ?? 0,
+      bustoutCount: existingTournament?.bustoutCount ?? 0,
+      payoutPlaces: existingTournament?.payoutPlaces ?? 0,
+      payouts: existingTournament?.payouts ?? [],
       chips: sortChips(
         draft.chips.map((chip) => ({
           color: chip.color,
@@ -649,12 +877,270 @@ function App() {
     }
   }
 
+  async function updateEntryCount(tournamentId, field, value) {
+    if (saving) {
+      return;
+    }
+
+    const parsedCount = Number(value);
+    const count = Number.isFinite(parsedCount)
+      ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedCount)))
+      : 0;
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === tournamentId
+        ? { ...tournament, [field]: count }
+        : tournament,
+    );
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setEntryCountDrafts((drafts) => {
+        const tournamentDrafts = { ...drafts[tournamentId] };
+        delete tournamentDrafts[field];
+        return { ...drafts, [tournamentId]: tournamentDrafts };
+      });
+    }
+  }
+
+  async function updateOtherValue(tournamentId, field, value) {
+    if (saving) {
+      return;
+    }
+
+    const parsedValue = Number(value);
+    const amount = Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0;
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === tournamentId
+        ? { ...tournament, [field]: amount }
+        : tournament,
+    );
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setEntryCountDrafts((drafts) => {
+        const tournamentDrafts = { ...drafts[tournamentId] };
+        delete tournamentDrafts[field];
+        return { ...drafts, [tournamentId]: tournamentDrafts };
+      });
+    }
+  }
+
+  async function updatePayoutPlaces(tournamentId, value) {
+    if (saving) {
+      return;
+    }
+
+    const parsedPlaces = Number(value);
+    const tournament = tournaments.find((item) => item.id === tournamentId);
+    if (!tournament) {
+      return;
+    }
+
+    const places = Number.isFinite(parsedPlaces)
+      ? Math.min(1_000, Math.max(0, Math.floor(parsedPlaces)))
+      : 0;
+
+    const payouts = Array.from({ length: places }, (_, index) =>
+      Number(tournament.payouts?.[index] ?? 0),
+    );
+    const nextTournaments = tournaments.map((item) =>
+      item.id === tournamentId
+        ? { ...item, payoutPlaces: places, payouts }
+        : item,
+    );
+
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setPayoutPlaceDrafts((drafts) => {
+        const nextDrafts = { ...drafts };
+        delete nextDrafts[tournamentId];
+        return nextDrafts;
+      });
+      setPayoutDrafts((drafts) => ({
+        ...drafts,
+        [tournamentId]: payouts.map(String),
+      }));
+    }
+  }
+
+  async function updatePayout(tournamentId, index, value) {
+    if (saving) {
+      return;
+    }
+
+    const parsedPayout = Number(value);
+    const amount =
+      value.trim() !== "" && Number.isFinite(parsedPayout)
+        ? Math.max(0, parsedPayout)
+        : 0;
+    const tournament = tournaments.find((item) => item.id === tournamentId);
+    if (!tournament) {
+      return;
+    }
+
+    const payouts = Array.from(
+      { length: tournament.payoutPlaces ?? 0 },
+      (_, payoutIndex) =>
+        payoutIndex === index
+          ? amount
+          : Number(tournament.payouts?.[payoutIndex] ?? 0),
+    );
+    const nextTournaments = tournaments.map((item) =>
+      item.id === tournamentId ? { ...item, payouts } : item,
+    );
+
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setPayoutDrafts((drafts) => {
+        const nextDrafts = [...(drafts[tournamentId] ?? [])];
+        nextDrafts[index] = String(amount);
+        return { ...drafts, [tournamentId]: nextDrafts };
+      });
+    }
+  }
+
+  async function resetEntryCounts() {
+    if (!activeTournament || saving) {
+      return;
+    }
+
+    const resetFields = {
+      buyinCount: 0,
+      rebuyCount: 0,
+      addonCount: 0,
+      otherPrizePool: 0,
+      otherChipstack: 0,
+      bustoutCount: 0,
+    };
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === activeTournament.id
+        ? { ...tournament, ...resetFields }
+        : tournament,
+    );
+
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setEntryCountDrafts((drafts) => ({
+        ...drafts,
+        [activeTournament.id]: {},
+      }));
+    }
+  }
+
   const activeTournament = tournaments.find(
     (tournament) => tournament.id === activeTournamentId,
   );
   const activeTournamentKey = activeTournament
-    ? JSON.stringify(activeTournament)
+    ? JSON.stringify({
+        ...activeTournament,
+        buyinCount: undefined,
+        rebuyCount: undefined,
+        addonCount: undefined,
+        otherPrizePool: undefined,
+        otherChipstack: undefined,
+        bustoutCount: undefined,
+        payoutPlaces: undefined,
+        payouts: undefined,
+      })
     : "";
+  const activeEntryCountDrafts = activeTournament
+    ? entryCountDrafts[activeTournament.id] ?? {}
+    : {};
+  const entryRows = activeTournament
+    ? [
+        {
+          label: "Buy-ins",
+          countField: "buyinCount",
+          cost: activeTournament.buyinCost,
+          chipstack: activeTournament.startingChipstack,
+          enabled: true,
+        },
+        {
+          label: "Rebuys",
+          countField: "rebuyCount",
+          cost: activeTournament.rebuyCost,
+          chipstack: activeTournament.rebuyChipstack,
+          enabled: activeTournament.rebuysAllowed,
+        },
+        {
+          label: "Addons",
+          countField: "addonCount",
+          cost: activeTournament.addonCost,
+          chipstack: activeTournament.addonChipstack,
+          enabled: activeTournament.addonsAllowed,
+        },
+      ]
+        .filter((entry) => entry.enabled)
+        .map((entry) => ({
+          ...entry,
+          count:
+            activeEntryCountDrafts[entry.countField] ??
+            activeTournament[entry.countField] ??
+            0,
+          contribution:
+            Number(
+              activeEntryCountDrafts[entry.countField] ??
+                activeTournament[entry.countField] ??
+                0,
+            ) * Number(entry.cost ?? 0),
+          chipsInPlay:
+            Number(
+              activeEntryCountDrafts[entry.countField] ??
+                activeTournament[entry.countField] ??
+                0,
+            ) * Number(entry.chipstack ?? 0),
+        }))
+    : [];
+  const totalPrizePool = entryRows.reduce(
+    (total, entry) => total + entry.contribution,
+    0,
+  ) +
+    Number(
+      activeEntryCountDrafts.otherPrizePool ??
+        activeTournament?.otherPrizePool ??
+        0,
+    );
+  const totalChipsInPlay = entryRows.reduce(
+    (total, entry) => total + entry.chipsInPlay,
+    0,
+  ) +
+    Number(
+      activeEntryCountDrafts.otherChipstack ??
+        activeTournament?.otherChipstack ??
+        0,
+    );
+  const bustoutCount = Number(
+    activeEntryCountDrafts.bustoutCount ??
+      activeTournament?.bustoutCount ??
+      0,
+  );
+  const remainingPlayers = Math.max(
+    0,
+    Number(
+      activeEntryCountDrafts.buyinCount ??
+        activeTournament?.buyinCount ??
+        0,
+    ) - bustoutCount,
+  );
+  const averageChipstack =
+    remainingPlayers > 0
+      ? Math.round(totalChipsInPlay / remainingPlayers)
+      : 0;
+  const parsedPayoutPlaces = activeTournament
+    ? Number(
+        payoutPlaceDrafts[activeTournament.id] ??
+          activeTournament.payoutPlaces ??
+          0,
+      )
+    : 0;
+  const payoutPlaces = Number.isFinite(parsedPayoutPlaces)
+    ? Math.min(1_000, Math.max(0, Math.floor(parsedPayoutPlaces)))
+    : 0;
+  const payouts = activeTournament
+    ? Array.from({ length: payoutPlaces }, (_, index) =>
+        Number(
+          payoutDrafts[activeTournament.id]?.[index] ??
+            activeTournament.payouts?.[index] ??
+            0,
+        ),
+      )
+    : [];
+  const payoutTotal = payouts.reduce((total, payout) => total + payout, 0);
+  const payoutsMatchPrizePool =
+    Math.round(payoutTotal * 100) === Math.round(totalPrizePool * 100);
   const totalDurationMs =
     activeTournament?.levels.reduce(
       (total, level) => total + getLevelDurationMs(level),
@@ -667,15 +1153,14 @@ function App() {
   const currentLevel = activeTournament
     ? getCurrentLevel(activeTournament.levels, currentElapsedMs)
     : null;
-  const levelProgress = currentLevel
-    ? Math.max(
-        0,
-        Math.min(
-          1,
-          currentLevel.remainingMs /
-            (currentLevel.endMs - currentLevel.startMs),
-        ),
-      )
+  const secondProgress = currentLevel
+    ? (currentLevel.remainingMs % 60_000 || 60_000) / 60_000
+    : 0;
+  const minuteProgress = currentLevel
+    ? (Math.floor(currentLevel.remainingMs / 60_000) % 60) / 60
+    : 0;
+  const hourProgress = currentLevel
+    ? (Math.floor(currentLevel.remainingMs / 3_600_000) % 12) / 12
     : 0;
   const progressColor =
     currentLevel?.remainingMs > 60_000
@@ -1003,6 +1488,86 @@ function App() {
     }
   }, [currentElapsedMs, startedAt, totalDurationMs]);
 
+  useEffect(() => {
+    function updateFullscreenState() {
+      setTimerIsFullscreen(
+        document.fullscreenElement === timerPanelRef.current,
+      );
+      if (document.fullscreenElement !== timerPanelRef.current) {
+        fullscreenExitInProgressRef.current = false;
+        window.clearTimeout(fullscreenExitTimerRef.current);
+        fullscreenExitTimerRef.current = null;
+      }
+    }
+
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () =>
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+  }, []);
+
+  useEffect(() => {
+    if (!timerIsFullscreen) {
+      return undefined;
+    }
+
+    function exitFullscreenAtScreenTop(event) {
+      if (event.clientY > 1) {
+        window.clearTimeout(fullscreenExitTimerRef.current);
+        fullscreenExitTimerRef.current = null;
+        return;
+      }
+
+      if (
+        fullscreenExitTimerRef.current !== null ||
+        fullscreenExitInProgressRef.current
+      ) {
+        return;
+      }
+
+      fullscreenExitTimerRef.current = window.setTimeout(() => {
+        fullscreenExitTimerRef.current = null;
+        if (document.fullscreenElement !== timerPanelRef.current) {
+          return;
+        }
+
+        fullscreenExitInProgressRef.current = true;
+        document.exitFullscreen().catch((error) => {
+          fullscreenExitInProgressRef.current = false;
+          console.error(
+            "Could not exit timer fullscreen at screen edge.",
+            error,
+          );
+          setTimerFullscreenError("Could not exit fullscreen mode.");
+        });
+      }, 500);
+    }
+
+    window.addEventListener("mousemove", exitFullscreenAtScreenTop);
+    return () => {
+      window.removeEventListener("mousemove", exitFullscreenAtScreenTop);
+      window.clearTimeout(fullscreenExitTimerRef.current);
+      fullscreenExitTimerRef.current = null;
+    };
+  }, [timerIsFullscreen]);
+
+  async function toggleTimerFullscreen() {
+    try {
+      setTimerFullscreenError("");
+      if (document.fullscreenElement === timerPanelRef.current) {
+        await document.exitFullscreen();
+      } else {
+        if (!timerPanelRef.current?.requestFullscreen) {
+          setTimerFullscreenError("Fullscreen mode is not available.");
+          return;
+        }
+        await timerPanelRef.current.requestFullscreen();
+      }
+    } catch (error) {
+      console.error("Could not toggle timer fullscreen.", error);
+      setTimerFullscreenError("Could not change fullscreen mode.");
+    }
+  }
+
   function toggleTimer() {
     if (!activeTournament || totalDurationMs <= 0) {
       return;
@@ -1123,9 +1688,9 @@ function App() {
               setActiveTab(tab);
               if (tab === "Timer") {
                 window.requestAnimationFrame(() => {
-                  window.scrollTo({
-                    top: document.documentElement.scrollHeight,
+                  timerPanelRef.current?.scrollIntoView({
                     behavior: "smooth",
+                    block: "start",
                   });
                 });
               }
@@ -1137,12 +1702,23 @@ function App() {
       </nav>
 
       <section
+        ref={timerPanelRef}
         id="active-panel"
-        className={`tab-panel${activeTab === "Timer" ? " timer-tab-panel" : ""}`}
+        className={`tab-panel${activeTab === "Timer" ? ` timer-tab-panel${startedAt !== null ? " timer-tab-panel-active" : ""}` : ""}`}
         role="tabpanel"
         aria-labelledby={`tab-${activeTab.toLowerCase()}`}
       >
         {activeTab !== "Timer" && <h2>{activeTab}</h2>}
+        {activeTab === "Timer" && timerFullscreenError && (
+          <p className="timer-fullscreen-error" role="alert">
+            {timerFullscreenError}
+          </p>
+        )}
+        {activeTab === "Timer" && storageError && (
+          <p className="timer-fullscreen-error" role="alert">
+            {storageError}
+          </p>
+        )}
         {activeTab === "Settings" ? (
           <div className="settings-panel">
             {timerSettingsError && (
@@ -1150,6 +1726,25 @@ function App() {
                 {timerSettingsError}
               </p>
             )}
+            <div className="settings-directory-controls">
+              <div>
+                <strong>Settings file directory</strong>
+                <p className="settings-directory-path">
+                  {settingsDirectory || "Loading directory..."}
+                </p>
+                <p className="settings-directory-help">
+                  Tournament structures and timer preferences are saved here.
+                  Existing files in the selected directory are kept.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={changeSettingsDirectory}
+                disabled={!timerSettingsLoaded || changingSettingsDirectory}
+              >
+                {changingSettingsDirectory ? "Changing..." : "Choose folder"}
+              </button>
+            </div>
             <label className="form-field">
               Level-change alarm
               <select
@@ -1227,7 +1822,7 @@ function App() {
               </label>
             </div>
             <p className="settings-save-status">
-              Settings save automatically on this device.
+              Settings save automatically in the selected directory.
             </p>
           </div>
         ) : activeTab === "Tournament" ? (
@@ -1362,6 +1957,22 @@ function App() {
                       />
                     </label>
                     <label className="form-field">
+                      Rebuy Chipstack
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draft.rebuyChipstack}
+                        disabled={saving || !draft.rebuysAllowed}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            rebuyChipstack: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
                       Rebuy description (optional)
                       <textarea
                         rows="2"
@@ -1403,6 +2014,22 @@ function App() {
                           setDraft((current) => ({
                             ...current,
                             addonCost: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      Addon Chipstack
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draft.addonChipstack}
+                        disabled={saving || !draft.addonsAllowed}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            addonChipstack: event.target.value,
                           }))
                         }
                       />
@@ -1951,6 +2578,14 @@ function App() {
                           <dd>{tournament.startingChipstack ?? "Not set"}</dd>
                         </div>
                         <div>
+                          <dt>Rebuy Chipstack</dt>
+                          <dd>{tournament.rebuyChipstack ?? "Not set"}</dd>
+                        </div>
+                        <div>
+                          <dt>Addon Chipstack</dt>
+                          <dd>{tournament.addonChipstack ?? "Not set"}</dd>
+                        </div>
+                        <div>
                           <dt>Rebuys Allowed?</dt>
                           <dd>{tournament.rebuysAllowed ? "Yes" : "No"}</dd>
                         </div>
@@ -2203,31 +2838,11 @@ function App() {
                   </div>
                   <div className="timer-left-chips" aria-label="Chips in use">
                     {timerChips.map((chip) => (
-                      <div
-                        className={[
-                          "timer-chip",
-                          chip.isColoringUp && !chip.isExiting
-                            ? "timer-chip-coloring-up"
-                            : "",
-                          chip.isEntering ? "timer-chip-entering" : "",
-                          chip.isExiting ? "timer-chip-removing" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
+                      <TimerChip
                         key={chip.key}
-                        style={{ "--chip-color": chip.color }}
-                        onAnimationEnd={(event) =>
-                          finishTimerChipAnimation(
-                            chip.key,
-                            event.animationName,
-                          )
-                        }
-                        role="img"
-                        aria-hidden={chip.isExiting}
-                        aria-label={`${formatChipNumber(chip.denomination)} chip`}
-                      >
-                        {formatChipNumber(chip.denomination)}
-                      </div>
+                        chip={chip}
+                        onAnimationEnd={finishTimerChipAnimation}
+                      />
                     ))}
                   </div>
                   <div className="timer-clock-area">
@@ -2245,19 +2860,52 @@ function App() {
                             r="46"
                           />
                           <circle
-                            className="timer-progress-value"
+                            className="timer-progress-value timer-progress-hours"
                             cx="50"
                             cy="50"
                             r="46"
                             style={{
+                              strokeDasharray: 289.03,
                               strokeDashoffset:
-                                289.03 * (1 - levelProgress),
+                                289.03 * (1 - hourProgress),
+                            }}
+                          />
+                          <circle
+                            className="timer-progress-track"
+                            cx="50"
+                            cy="50"
+                            r="42.6"
+                          />
+                          <circle
+                            className="timer-progress-value timer-progress-minutes"
+                            cx="50"
+                            cy="50"
+                            r="42.6"
+                            style={{
+                              strokeDasharray: 267.66,
+                              strokeDashoffset:
+                                267.66 * (1 - minuteProgress),
+                            }}
+                          />
+                          <circle
+                            className="timer-progress-track"
+                            cx="50"
+                            cy="50"
+                            r="39.2"
+                          />
+                          <circle
+                            className="timer-progress-value timer-progress-seconds"
+                            cx="50"
+                            cy="50"
+                            r="39.2"
+                            style={{
+                              strokeDasharray: 246.3,
+                              strokeDashoffset:
+                                246.3 * (1 - secondProgress),
                             }}
                           />
                         </svg>
-                        <p className="timer-clock" aria-live="off">
-                          {formatClock(currentLevel.remainingMs)}
-                        </p>
+                        <TimerClock remainingMs={currentLevel.remainingMs} />
                       </div>
                     ) : (
                       <p className="timer-complete">
@@ -2267,10 +2915,308 @@ function App() {
                       </p>
                     )}
                   </div>
-                  <div
-                    className="timer-grid-spacer timer-right-middle"
-                    aria-hidden="true"
-                  />
+                  <div className="timer-right-middle timer-entry-column">
+                  <div className="timer-entry-controls">
+                    <div className="timer-entry-heading">
+                      <h3>Entries</h3>
+                      <button
+                        className="timer-entry-reset"
+                        type="button"
+                        onClick={resetEntryCounts}
+                        disabled={saving}
+                        aria-label="Reset entries"
+                        title="Reset entries"
+                      >
+                        <TimerIcon name="reset" />
+                      </button>
+                    </div>
+                    <table className="timer-entry-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Type</th>
+                          <th scope="col">Count</th>
+                          <th scope="col">Prize Pool</th>
+                          <th scope="col">Chips</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entryRows.map((entry) => (
+                          <tr key={entry.countField}>
+                            <th scope="row">{entry.label}</th>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={entry.count}
+                                disabled={saving}
+                                aria-label={`${entry.label} count`}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setEntryCountDrafts((drafts) => ({
+                                    ...drafts,
+                                    [activeTournament.id]: {
+                                      ...drafts[activeTournament.id],
+                                      [entry.countField]: value,
+                                    },
+                                  }));
+                                }}
+                                onBlur={(event) =>
+                                  updateEntryCount(
+                                    activeTournament.id,
+                                    entry.countField,
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </td>
+                            <td>
+                              {entry.contribution.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                            <td>{entry.chipsInPlay.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                        <tr>
+                          <th scope="row">Other</th>
+                          <td aria-label="Other entry count" />
+                          <td>
+                            <input
+                              className="timer-other-input"
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={
+                                activeEntryCountDrafts.otherPrizePool ??
+                                activeTournament.otherPrizePool ??
+                                0
+                              }
+                              disabled={saving}
+                              aria-label="Other prize-pool contribution"
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setEntryCountDrafts((drafts) => ({
+                                  ...drafts,
+                                  [activeTournament.id]: {
+                                    ...drafts[activeTournament.id],
+                                    otherPrizePool: value,
+                                  },
+                                }));
+                              }}
+                              onBlur={(event) =>
+                                updateOtherValue(
+                                  activeTournament.id,
+                                  "otherPrizePool",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="timer-other-input"
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={
+                                activeEntryCountDrafts.otherChipstack ??
+                                activeTournament.otherChipstack ??
+                                0
+                              }
+                              disabled={saving}
+                              aria-label="Other chips-in-play contribution"
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setEntryCountDrafts((drafts) => ({
+                                  ...drafts,
+                                  [activeTournament.id]: {
+                                    ...drafts[activeTournament.id],
+                                    otherChipstack: value,
+                                  },
+                                }));
+                              }}
+                              onBlur={(event) =>
+                                updateOtherValue(
+                                  activeTournament.id,
+                                  "otherChipstack",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <th colSpan="2" scope="row">
+                            Total
+                          </th>
+                          <td>
+                            {totalPrizePool.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td>{totalChipsInPlay.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                          <th scope="row">Bustouts</th>
+                          <td>
+                            <input
+                              className="timer-entry-count-input"
+                              type="number"
+                              min="0"
+                              max={Math.max(
+                                0,
+                                Number(
+                                  activeEntryCountDrafts.buyinCount ??
+                                    activeTournament.buyinCount ??
+                                    0,
+                                ) - 1,
+                              )}
+                              step="1"
+                              value={
+                                activeEntryCountDrafts.bustoutCount ??
+                                activeTournament.bustoutCount ??
+                                0
+                              }
+                              disabled={saving}
+                              aria-label="Bustouts count"
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setEntryCountDrafts((drafts) => ({
+                                  ...drafts,
+                                  [activeTournament.id]: {
+                                    ...drafts[activeTournament.id],
+                                    bustoutCount: value,
+                                  },
+                                }));
+                              }}
+                              onBlur={(event) =>
+                                updateEntryCount(
+                                  activeTournament.id,
+                                  "bustoutCount",
+                                  event.target.value,
+                                )
+                              }
+                            />
+                          </td>
+                          <td />
+                          <td>{averageChipstack.toLocaleString()}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div className="timer-payout-controls">
+                    <div className="timer-entry-heading">
+                      <h3>Payouts</h3>
+                      <label className="timer-payout-places">
+                        <span>Players paid</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="1000"
+                          step="1"
+                          value={
+                            payoutPlaceDrafts[activeTournament.id] ??
+                            activeTournament.payoutPlaces ??
+                            0
+                          }
+                          disabled={saving}
+                          aria-label="Number of players paid"
+                          onChange={(event) =>
+                            setPayoutPlaceDrafts((drafts) => ({
+                              ...drafts,
+                              [activeTournament.id]: event.target.value,
+                            }))
+                          }
+                          onBlur={(event) =>
+                            updatePayoutPlaces(
+                              activeTournament.id,
+                              event.target.value,
+                            )
+                          }
+                        />
+                      </label>
+                    </div>
+                    <table className="timer-payout-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">Place</th>
+                          <th scope="col">Payout</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payouts.map((payout, index) => (
+                          <tr key={index}>
+                            <th scope="row">{index + 1}</th>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="5"
+                                value={
+                                  payoutDrafts[activeTournament.id]?.[index] ??
+                                  activeTournament.payouts?.[index] ??
+                                  0
+                                }
+                                disabled={saving}
+                                aria-label={`Payout for place ${index + 1}`}
+                                onChange={(event) => {
+                                  const nextDrafts = [
+                                    ...(payoutDrafts[activeTournament.id] ?? []),
+                                  ];
+                                  nextDrafts[index] = event.target.value;
+                                  setPayoutDrafts((drafts) => ({
+                                    ...drafts,
+                                    [activeTournament.id]: nextDrafts,
+                                  }));
+                                }}
+                                onBlur={(event) =>
+                                  updatePayout(
+                                    activeTournament.id,
+                                    index,
+                                    event.target.value,
+                                  )
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <th scope="row">Total</th>
+                          <td>
+                            {payoutTotal.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                    <p
+                      className={
+                        payoutsMatchPrizePool
+                          ? "timer-payout-status is-matched"
+                          : "timer-payout-status is-mismatched"
+                      }
+                      role={payoutsMatchPrizePool ? "status" : "alert"}
+                    >
+                      {payoutsMatchPrizePool
+                        ? "Payouts match the prize pool."
+                        : `Payouts differ from the prize pool by ${Math.abs(
+                            payoutTotal - totalPrizePool,
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}.`}
+                    </p>
+                  </div>
+                  </div>
                   <div className="timer-bottom-center">
                     <div className="timer-controls">
                     <button
@@ -2353,12 +3299,26 @@ function App() {
                         aria-label="Timer volume"
                       />
                     </label>
+                    <button
+                      className="timer-control-button"
+                      type="button"
+                      onClick={toggleTimerFullscreen}
+                      aria-label={
+                        timerIsFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                      }
+                      aria-pressed={timerIsFullscreen}
+                      title={
+                        timerIsFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                      }
+                    >
+                      <TimerIcon
+                        name={
+                          timerIsFullscreen ? "exit-fullscreen" : "fullscreen"
+                        }
+                      />
+                    </button>
                     </div>
                   </div>
-                  <div
-                    className="timer-grid-spacer timer-right-bottom"
-                    aria-hidden="true"
-                  />
                 </div>
               ) : (
                 <div>
