@@ -106,8 +106,62 @@
 
 .timer-tab-panel-active .timer-blinds-group,
 .timer-tab-panel-active .timer-next-blinds-group,
-.timer-tab-panel-active .timer-clock {
-  animation: timer-text-color-cycle 240s linear infinite;
+.timer-tab-panel-active .timer-clock,
+.timer-tab-panel-active .timer-message,
+.timer-tab-panel-active .timer-entry-heading h3,
+.timer-tab-panel-active .timer-entry-table thead th,
+.timer-tab-panel-active .timer-bustout-table thead th,
+.timer-tab-panel-active .timer-payout-table thead th,
+.timer-tab-panel-active .timer-tables-table thead th,
+.timer-tab-panel-active .timer-entry-table,
+.timer-tab-panel-active .timer-entry-table th,
+.timer-tab-panel-active .timer-entry-table td,
+.timer-tab-panel-active .timer-bustout-table,
+.timer-tab-panel-active .timer-bustout-table th,
+.timer-tab-panel-active .timer-bustout-table td,
+.timer-tab-panel-active .timer-payout-table,
+.timer-tab-panel-active .timer-payout-table th,
+.timer-tab-panel-active .timer-payout-table td,
+.timer-tab-panel-active .timer-tables-table,
+.timer-tab-panel-active .timer-tables-table th,
+.timer-tab-panel-active .timer-tables-table td {
+  animation: timer-complementary-color-cycle 240s linear infinite;
+}
+
+.timer-tab-panel-active .timer-entry-heading,
+.timer-tab-panel-active .timer-entry-controls,
+.timer-tab-panel-active .timer-bustout-controls,
+.timer-tab-panel-active .timer-payout-controls,
+.timer-tab-panel-active .timer-tables-controls,
+.timer-tab-panel-active .timer-entry-table th,
+.timer-tab-panel-active .timer-entry-table td,
+.timer-tab-panel-active .timer-bustout-table th,
+.timer-tab-panel-active .timer-bustout-table td,
+.timer-tab-panel-active .timer-payout-table th,
+.timer-tab-panel-active .timer-payout-table td,
+.timer-tab-panel-active .timer-tables-table th,
+.timer-tab-panel-active .timer-tables-table td {
+  animation: timer-complementary-color-cycle 240s linear infinite;
+}
+
+.timer-tab-panel-active button {
+  animation: timer-complementary-color-cycle 240s linear infinite;
+}
+
+.timer-tab-panel input {
+  border: 0;
+}
+
+.timer-tab-panel button {
+  border: 0;
+}
+
+.timer-tab-panel-active input {
+  animation: timer-complementary-color-cycle 240s linear infinite;
+}
+
+.timer-tab-panel-active .timer-volume-control input {
+  accent-color: currentColor;
 }
 
 .timer-tab-panel:fullscreen {
@@ -140,6 +194,16 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.timer-tab-panel input,
+.timer-tab-panel button {
+  background-color: transparent;
+  color: inherit;
+}
+
+.timer-tab-panel table input {
+  color: inherit;
+}
+
 @keyframes timer-panel-color-cycle {
   0%,
   100% {
@@ -159,22 +223,26 @@
   }
 }
 
-@keyframes timer-text-color-cycle {
+@keyframes timer-complementary-color-cycle {
   0%,
   100% {
-    color: #ffc2e4;
+    color: hsl(208 70% 80%);
+    border-color: hsl(208 70% 80% / 70%);
   }
 
   25% {
-    color: #b7f5ce;
+    color: hsl(44 60% 75%);
+    border-color: hsl(44 60% 75% / 70%);
   }
 
   50% {
     color: #fff;
+    border-color: rgb(255 255 255 / 70%);
   }
 
   75% {
-    color: #ffe2a8;
+    color: hsl(272 70% 80%);
+    border-color: hsl(272 70% 80% / 70%);
   }
 }
 
@@ -185,7 +253,44 @@
 
   .timer-tab-panel-active .timer-blinds-group,
   .timer-tab-panel-active .timer-next-blinds-group,
-  .timer-tab-panel-active .timer-clock {
+  .timer-tab-panel-active .timer-clock,
+  .timer-tab-panel-active .timer-message,
+  .timer-tab-panel-active .timer-message-text,
+  .timer-tab-panel-active .timer-entry-heading h3,
+  .timer-tab-panel-active .timer-entry-table thead th,
+  .timer-tab-panel-active .timer-bustout-table thead th,
+  .timer-tab-panel-active .timer-payout-table thead th,
+  .timer-tab-panel-active .timer-tables-table thead th,
+  .timer-tab-panel-active .timer-entry-table,
+  .timer-tab-panel-active .timer-entry-table th,
+  .timer-tab-panel-active .timer-entry-table td,
+  .timer-tab-panel-active .timer-bustout-table,
+  .timer-tab-panel-active .timer-bustout-table th,
+  .timer-tab-panel-active .timer-bustout-table td,
+  .timer-tab-panel-active .timer-payout-table,
+  .timer-tab-panel-active .timer-payout-table th,
+  .timer-tab-panel-active .timer-payout-table td,
+  .timer-tab-panel-active .timer-tables-table,
+  .timer-tab-panel-active .timer-tables-table th,
+  .timer-tab-panel-active .timer-tables-table td {
+    animation: none;
+  }
+
+  .timer-tab-panel-active .timer-entry-heading,
+  .timer-tab-panel-active .timer-entry-controls,
+  .timer-tab-panel-active .timer-bustout-controls,
+  .timer-tab-panel-active .timer-payout-controls,
+  .timer-tab-panel-active .timer-tables-controls,
+  .timer-tab-panel-active .timer-entry-table th,
+  .timer-tab-panel-active .timer-entry-table td,
+  .timer-tab-panel-active .timer-bustout-table th,
+  .timer-tab-panel-active .timer-bustout-table td,
+  .timer-tab-panel-active .timer-payout-table th,
+  .timer-tab-panel-active .timer-payout-table td,
+  .timer-tab-panel-active .timer-tables-table th,
+  .timer-tab-panel-active .timer-tables-table td,
+  .timer-tab-panel-active input,
+  .timer-tab-panel-active button {
     animation: none;
   }
 }
@@ -283,12 +388,34 @@
 }
 
 .timer-entry-controls,
+.timer-bustout-controls,
 .timer-payout-controls {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: clamp(0.35rem, 1vh, 0.75rem);
-  margin-top: 1.5em;
+}
+
+.timer-bustout-controls,
+.timer-payout-controls {
+  margin-top: 0.375em;
+}
+
+.timer-payout-section {
+  order: 1;
+}
+
+.timer-bustout-section {
+  order: 2;
+}
+
+.timer-tables-controls {
+  order: 3;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: clamp(0.35rem, 1vh, 0.75rem);
+  margin-top: 0.375em;
 }
 
 .timer-entry-heading {
@@ -305,6 +432,13 @@
   font-size: clamp(0.9rem, 2.5vh, 1.5rem);
 }
 
+.timer-entry-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
 .timer-entry-reset {
   display: grid;
   width: 2rem;
@@ -318,12 +452,21 @@
   height: 1.1rem;
 }
 
+.timer-entry-controls,
+.timer-bustout-controls,
+.timer-payout-controls,
+.timer-tables-controls {
+  border-top: 3px solid rgba(255, 255, 255, 0.8);
+  padding-top: 0.5rem;
+}
+
 .timer-entry-table {
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: clamp(0.65rem, 1.6vh, 0.95rem);
   text-align: left;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .timer-entry-table th,
@@ -429,6 +572,95 @@
   border-collapse: collapse;
   font-size: clamp(0.65rem, 1.6vh, 0.95rem);
   text-align: left;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.timer-tables-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: clamp(0.65rem, 1.6vh, 0.95rem);
+  text-align: left;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.timer-tables-table th,
+.timer-tables-table td {
+  padding: 0.25rem 0.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.timer-tables-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-tables-table .timer-tables-description,
+.timer-tables-table tfoot th {
+  text-align: left;
+}
+
+.timer-tables-table tfoot th,
+.timer-tables-table tfoot td {
+  border-top: 2px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.timer-bustout-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: clamp(0.65rem, 1.6vh, 0.95rem);
+  text-align: left;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.timer-bustout-table th,
+.timer-bustout-table td {
+  padding: 0.25rem 0.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.timer-bustout-table th {
+  font-weight: 600;
+}
+
+.timer-bustout-table thead th {
+  font-size: 0.85em;
+}
+
+.timer-bustout-table th:nth-child(1),
+.timer-bustout-table td:nth-child(1) {
+  text-align: left;
+}
+
+.timer-bustout-table tbody td:nth-child(2) {
+  text-align: left;
+}
+
+.timer-bustout-table th:last-child,
+.timer-bustout-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-bustout-table tfoot th,
+.timer-bustout-table tfoot td {
+  border-top: 2px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.timer-bustout-table input[type="number"] {
+  display: block;
+  width: calc(100% - 0.4rem);
+  min-width: 0;
+  padding: 0.2rem;
+  margin: 0 auto 0 0;
+  font-size: inherit;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
 }
 
 .timer-payout-table th,
@@ -465,17 +697,21 @@
   font-weight: 700;
 }
 
-.timer-payout-status {
-  margin: 0;
-  font-size: 0.8em;
+.timer-payout-table tfoot .timer-payout-total {
+  padding-right: calc(0.15rem + 2.4em);
 }
 
-.timer-payout-status.is-matched {
-  color: #b7f5bf;
+.timer-payout-total {
+  position: relative;
 }
 
-.timer-payout-status.is-mismatched {
-  color: #ffd0d0;
+.timer-payout-match {
+  position: absolute;
+  right: 100%;
+  margin-right: 0.35rem;
+  color: #55e878;
+  font-size: 1.15em;
+  line-height: 1;
 }
 
 .timer-right-bottom {
@@ -571,6 +807,7 @@
 .timer-clock-area {
   display: flex;
   grid-area: clock;
+  container-type: inline-size;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
@@ -590,7 +827,7 @@
   padding: 0 0.2em 0.02em;
   border-bottom: 1px solid currentColor;
   margin: 0 auto;
-  font-size: clamp(1.75rem, 16vh, 16rem);
+  font-size: clamp(1.925rem, 17.6vh, 17.6rem);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
@@ -667,6 +904,40 @@
   text-align: center;
 }
 
+.timer-message {
+  position: absolute;
+  top: calc(72% + 1em);
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  width: 100%;
+  height: 50%;
+  pointer-events: none;
+  place-items: center;
+  padding: 0.25rem 1rem;
+  transform: translate(-50%, -50%);
+  font-size: clamp(3rem, 15cqi, 9rem);
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.timer-message-text {
+  animation: timer-message-fade 10s ease-in-out both;
+}
+
+@keyframes timer-message-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+
+  10%,
+  90% {
+    opacity: 1;
+  }
+}
+
 .timer-next-blinds {
   width: fit-content;
   max-width: 100%;
@@ -674,7 +945,7 @@
   padding: 0 0.2em 0.02em;
   border-bottom: 1px solid currentColor;
   margin: 0 auto;
-  font-size: clamp(0.875rem, 8vh, 8rem);
+  font-size: clamp(1.094rem, 10vh, 10rem);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1.05;
@@ -726,7 +997,7 @@
 
 .timer-toggle:focus-visible,
 .timer-controls button:focus-visible {
-  outline: 2px solid #396cd8;
+  outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 
@@ -956,6 +1227,13 @@
   white-space: nowrap;
 }
 
+.chip-stack-match {
+  margin-right: 0.35rem;
+  color: #248a3d;
+  font-size: 1.15em;
+  line-height: 1;
+}
+
 .tournament-flag {
   flex-direction: row;
   align-items: center;
@@ -974,6 +1252,18 @@
   display: grid;
   gap: 1rem;
   text-align: left;
+}
+
+.settings-countdown-warning {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d5d5d5;
+}
+
+.settings-countdown-warning h3,
+.settings-countdown-warning p {
+  margin: 0;
 }
 
 .settings-directory-controls {

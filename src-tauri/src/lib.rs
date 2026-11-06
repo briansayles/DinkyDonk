@@ -1,7 +1,69 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::Manager;
+use std::sync::mpsc::{self, Sender};
+use tauri::{Manager, State};
+
+struct KeepAwakeRequest {
+    enabled: bool,
+    response: Sender<Result<(), String>>,
+}
+
+struct KeepAwakeController {
+    sender: Sender<KeepAwakeRequest>,
+}
+
+#[tauri::command]
+fn set_keep_awake(
+    enabled: bool,
+    controller: State<'_, KeepAwakeController>,
+) -> Result<(), String> {
+    let (response_sender, response_receiver) = mpsc::channel();
+    controller
+        .sender
+        .send(KeepAwakeRequest {
+            enabled,
+            response: response_sender,
+        })
+        .map_err(|error| format!("Could not update keep-awake state: {error}"))?;
+
+    response_receiver
+        .recv()
+        .map_err(|error| format!("Could not receive keep-awake result: {error}"))?
+}
+
+#[cfg(windows)]
+fn set_execution_state(enabled: bool) -> Result<(), String> {
+    const ES_CONTINUOUS: u32 = 0x80000000;
+    const ES_DISPLAY_REQUIRED: u32 = 0x00000002;
+    const ES_SYSTEM_REQUIRED: u32 = 0x00000001;
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn SetThreadExecutionState(execution_state: u32) -> u32;
+    }
+
+    let execution_state = if enabled {
+        ES_CONTINUOUS | ES_DISPLAY_REQUIRED | ES_SYSTEM_REQUIRED
+    } else {
+        ES_CONTINUOUS
+    };
+    let result = unsafe { SetThreadExecutionState(execution_state) };
+
+    if result == 0 {
+        Err(format!(
+            "Could not update Windows execution state: {}",
+            std::io::Error::last_os_error()
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+fn set_execution_state(_enabled: bool) -> Result<(), String> {
+    Ok(())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -69,6 +131,8 @@ struct Tournament {
     #[serde(default)]
     payouts: Vec<f64>,
     #[serde(default)]
+    max_players_per_table: u32,
+    #[serde(default)]
     chips: Vec<TournamentChip>,
     levels: Vec<TournamentLevel>,
 }
@@ -86,7 +150,33 @@ struct TimerSettings {
     alarm_sound: String,
     volume: f64,
     spoken_announcement_enabled: bool,
+    #[serde(default = "default_announcement_speed")]
+    announcement_speed: f64,
     announcement: String,
+    #[serde(default = "default_countdown_warning_seconds")]
+    countdown_warning_seconds: u32,
+    #[serde(default = "default_countdown_warning_sound")]
+    countdown_warning_sound: String,
+    #[serde(default)]
+    countdown_warning_speech_enabled: bool,
+    #[serde(default = "default_countdown_warning_announcement")]
+    countdown_warning_announcement: String,
+}
+
+fn default_announcement_speed() -> f64 {
+    1.0
+}
+
+fn default_countdown_warning_seconds() -> u32 {
+    10
+}
+
+fn default_countdown_warning_sound() -> String {
+    "single-ding".to_string()
+}
+
+fn default_countdown_warning_announcement() -> String {
+    "{seconds} seconds remaining.".to_string()
 }
 
 #[derive(Deserialize)]
@@ -267,11 +357,30 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let (keep_awake_sender, keep_awake_receiver) = mpsc::channel::<KeepAwakeRequest>();
+
     tauri::Builder::default()
+        .manage(KeepAwakeController {
+            sender: keep_awake_sender,
+        })
+        .setup(move |_app| {
+            std::thread::Builder::new()
+                .name("keep-awake-controller".to_string())
+                .spawn(move || {
+                    while let Ok(request) = keep_awake_receiver.recv() {
+                        let result = set_execution_state(request.enabled);
+                        let _ = request.response.send(result);
+                    }
+                    let _ = set_execution_state(false);
+                })
+                .map_err(Box::<dyn std::error::Error>::from)?;
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            set_keep_awake,
             get_settings_directory,
             set_settings_directory,
             load_tournaments,

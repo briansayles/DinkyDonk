@@ -5,6 +5,10 @@ import "./App.css";
 
 const tabs = ["Timer", "Tournament", "Players", "Settings"];
 const timerSettingsStorageKey = "dinky-donk-timer-settings";
+const curatedBlindValues = [
+  1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 250,
+  300, 400, 500, 600, 750, 1000,
+];
 const alarmSoundOptions = [
   "single-ding",
   "double-ding",
@@ -19,6 +23,11 @@ const defaultTimerSettings = {
   alarmSound: "triple-ding",
   volume: 1,
   spokenAnnouncementEnabled: true,
+  announcementSpeed: 1,
+  countdownWarningSeconds: 10,
+  countdownWarningSound: "single-ding",
+  countdownWarningSpeechEnabled: false,
+  countdownWarningAnnouncement: "{seconds} seconds remaining.",
   announcement:
     "The blinds are now {smallBlind} and {bigBlind}{antePhrase}.",
 };
@@ -36,6 +45,29 @@ function normalizeTimerSettings(settings) {
       typeof settings?.spokenAnnouncementEnabled === "boolean"
         ? settings.spokenAnnouncementEnabled
         : defaultTimerSettings.spokenAnnouncementEnabled,
+    announcementSpeed:
+      typeof settings?.announcementSpeed === "number" &&
+      Number.isFinite(settings.announcementSpeed)
+        ? Math.max(0.5, Math.min(2, settings.announcementSpeed))
+        : defaultTimerSettings.announcementSpeed,
+    countdownWarningSeconds:
+      typeof settings?.countdownWarningSeconds === "number" &&
+      Number.isFinite(settings.countdownWarningSeconds)
+        ? Math.max(1, Math.min(3_600, Math.floor(settings.countdownWarningSeconds)))
+        : defaultTimerSettings.countdownWarningSeconds,
+    countdownWarningSound: alarmSoundOptions.includes(
+      settings?.countdownWarningSound,
+    )
+      ? settings.countdownWarningSound
+      : defaultTimerSettings.countdownWarningSound,
+    countdownWarningSpeechEnabled:
+      typeof settings?.countdownWarningSpeechEnabled === "boolean"
+        ? settings.countdownWarningSpeechEnabled
+        : defaultTimerSettings.countdownWarningSpeechEnabled,
+    countdownWarningAnnouncement:
+      typeof settings?.countdownWarningAnnouncement === "string"
+        ? settings.countdownWarningAnnouncement
+        : defaultTimerSettings.countdownWarningAnnouncement,
     announcement:
       typeof settings?.announcement === "string"
         ? settings.announcement
@@ -43,7 +75,7 @@ function normalizeTimerSettings(settings) {
   };
 }
 
-function TimerChip({ chip, onAnimationEnd }) {
+function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
   const chipRef = useRef(null);
 
   useLayoutEffect(() => {
@@ -95,6 +127,8 @@ function TimerChip({ chip, onAnimationEnd }) {
       role="img"
       aria-hidden={chip.isExiting}
       aria-label={`${formatChipNumber(chip.denomination)} chip`}
+      title="Double-click to edit chip settings"
+      onDoubleClick={onDoubleClick}
     >
       {formatChipNumber(chip.denomination)}
     </div>
@@ -151,6 +185,42 @@ function createEmptyLevel() {
   };
 }
 
+function getNextBlindValue(previousValue, scale = 1) {
+  const previousBlind = Number(previousValue);
+  const threshold = Number.isFinite(previousBlind)
+    ? previousBlind / scale
+    : 0;
+  const nextBlind = curatedBlindValues.find((blind) => blind > threshold);
+  return nextBlind === undefined ? "" : nextBlind * scale;
+}
+
+function createNextLevel(previousLevel, duration = "") {
+  const previousSmallBlind = Number(previousLevel?.smallBlind);
+  const blindScale =
+    previousSmallBlind >= 10_000 && previousSmallBlind < 100_000
+      ? 100
+      : previousSmallBlind >= 1_000 && previousSmallBlind < 10_000
+        ? 10
+        : 1;
+  const smallBlind = getNextBlindValue(
+    previousLevel?.smallBlind,
+    blindScale,
+  );
+  const previousAnte = Number(previousLevel?.ante);
+  const ante =
+    Number.isFinite(previousAnte) && previousAnte > 0
+      ? getNextBlindValue(previousAnte, blindScale)
+      : "";
+
+  return {
+    ...createEmptyLevel(),
+    duration,
+    smallBlind,
+    bigBlind: smallBlind === "" ? "" : smallBlind * 2,
+    ante,
+  };
+}
+
 function sortChips(chips) {
   return [...chips].sort((first, second) => {
     const firstDenomination =
@@ -186,10 +256,32 @@ function formatChipStackTotal(chips) {
   return summary.total.toLocaleString();
 }
 
-function formatChipNumber(value) {
+function formatAmount(value) {
   return Number(value).toLocaleString(undefined, {
     maximumFractionDigits: 20,
   });
+}
+
+function formatChipNumber(value) {
+  return formatAmount(value);
+}
+
+function formatBlinds(smallBlind, bigBlind, ante) {
+  const small = Number(smallBlind ?? 0);
+  const big = Number(bigBlind ?? 0);
+  const anteValue = Number(ante ?? 0);
+  const formatBlindValue = (value) => {
+    if (value < 1_000) {
+      return formatChipNumber(value);
+    }
+
+    return `${formatChipNumber(value / 1_000).trimEnd()}k`;
+  };
+  const blindText = `${formatBlindValue(small)}/${formatBlindValue(big)}`;
+
+  return anteValue > 0
+    ? `${blindText} + ${formatBlindValue(anteValue)}`
+    : blindText;
 }
 
 function getMaxChipSupportedPlayers(chips) {
@@ -401,6 +493,26 @@ function TimerIcon({ name }) {
           />
         </>
       )}
+      {name === "collapse" && (
+        <path
+          d="m6 15 6-6 6 6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+      {name === "expand" && (
+        <path
+          d="m6 9 6 6 6-6"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
       {name === "rewind" && (
         <>
           <path d="M4 5h2v14H4z" fill="currentColor" />
@@ -453,10 +565,12 @@ function App() {
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editSectionToActivate, setEditSectionToActivate] = useState(null);
   const [draft, setDraft] = useState(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [startedAt, setStartedAt] = useState(null);
   const [clockNowMs, setClockNowMs] = useState(0);
+  const [timerMessageIndex, setTimerMessageIndex] = useState(0);
   const [timerChips, setTimerChips] = useState([]);
   const timerChipsTargetRef = useRef([]);
   const [timerSettings, setTimerSettings] = useState(defaultTimerSettings);
@@ -467,13 +581,19 @@ function App() {
   const [timerFullscreenError, setTimerFullscreenError] = useState("");
   const [timerIsFullscreen, setTimerIsFullscreen] = useState(false);
   const [entryCountDrafts, setEntryCountDrafts] = useState({});
+  const [entriesCollapsed, setEntriesCollapsed] = useState(false);
+  const [bustoutsCollapsed, setBustoutsCollapsed] = useState(false);
+  const [payoutsCollapsed, setPayoutsCollapsed] = useState(false);
+  const [tablesCollapsed, setTablesCollapsed] = useState(false);
   const [payoutPlaceDrafts, setPayoutPlaceDrafts] = useState({});
   const [payoutDrafts, setPayoutDrafts] = useState({});
+  const [tableMaxDrafts, setTableMaxDrafts] = useState({});
   const timerPanelRef = useRef(null);
   const fullscreenExitInProgressRef = useRef(false);
   const fullscreenExitTimerRef = useRef(null);
   const audioContextRef = useRef(null);
   const previousLevelRef = useRef(null);
+  const previousWarningLevelRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -574,6 +694,21 @@ function App() {
       });
   }, [timerSettings, timerSettingsLoaded]);
 
+  useEffect(() => {
+    if (!draft || !editingId || !editSectionToActivate) {
+      return;
+    }
+
+    const section = document.getElementById(editSectionToActivate);
+    if (!section) {
+      return;
+    }
+
+    section.scrollIntoView({ behavior: "smooth", block: "center" });
+    section.querySelector("input, textarea, button")?.focus({ preventScroll: true });
+    setEditSectionToActivate(null);
+  }, [draft, editSectionToActivate, editingId]);
+
   async function changeSettingsDirectory() {
     try {
       const selectedDirectory = await open({
@@ -668,6 +803,17 @@ function App() {
     });
   }
 
+  function editTournamentSection(tournamentId, sectionId) {
+    const tournament = tournaments.find((item) => item.id === tournamentId);
+    if (!tournament) {
+      return;
+    }
+
+    editTournament(tournament);
+    setEditSectionToActivate(sectionId);
+    setActiveTab("Tournament");
+  }
+
   function updateLevel(index, field, value) {
     setDraft((current) => ({
       ...current,
@@ -692,64 +838,7 @@ function App() {
         return current;
       }
 
-      const previousLevel =
-        index > 0 && !current.levels[index - 1].isBreak
-          ? current.levels[index - 1]
-          : null;
-      const nextLevel =
-        index < current.levels.length - 1 &&
-        !current.levels[index + 1].isBreak
-          ? current.levels[index + 1]
-          : null;
-      const fields = ["smallBlind", "bigBlind", "ante"];
-      const values = Object.fromEntries(
-        fields.map((field) => {
-          const currentValue = Number(level[field] ?? 0) || 0;
-          if (nextLevel) {
-            const nextValue = Number(nextLevel[field] ?? 0) || 0;
-            return [field, (currentValue + nextValue) / 2];
-          }
-
-          if (previousLevel) {
-            const previousValue = Number(previousLevel[field] ?? 0) || 0;
-            return [
-              field,
-              Math.max(0, currentValue + (currentValue - previousValue)),
-            ];
-          }
-
-          return [
-            field,
-            currentValue > 0
-              ? currentValue + Math.max(1, Math.round(currentValue / 2))
-              : 0,
-          ];
-        }),
-      );
-
-      if (!nextLevel && !previousLevel && Object.values(values).every((value) => value === 0)) {
-        values.smallBlind = 1;
-        values.bigBlind = 2;
-      } else if (
-        !nextLevel &&
-        previousLevel &&
-        fields.reduce((total, field) => total + values[field], 0) <=
-          fields.reduce(
-            (total, field) => total + (Number(level[field] ?? 0) || 0),
-            0,
-          )
-      ) {
-        values.bigBlind += Math.max(
-          1,
-          Math.round((Number(level.bigBlind ?? 0) || 0) / 2),
-        );
-      }
-
-      const insertedLevel = {
-        ...createEmptyLevel(),
-        duration: level.duration ?? "",
-        ...values,
-      };
+      const insertedLevel = createNextLevel(level, level.duration ?? "");
 
       return {
         ...current,
@@ -818,6 +907,7 @@ function App() {
       bustoutCount: existingTournament?.bustoutCount ?? 0,
       payoutPlaces: existingTournament?.payoutPlaces ?? 0,
       payouts: existingTournament?.payouts ?? [],
+      maxPlayersPerTable: existingTournament?.maxPlayersPerTable ?? 0,
       chips: sortChips(
         draft.chips.map((chip) => ({
           color: chip.color,
@@ -1020,6 +1110,71 @@ function App() {
     }
   }
 
+  async function resetBustoutCount() {
+    if (!activeTournament || saving) {
+      return;
+    }
+
+    await updateEntryCount(activeTournament.id, "bustoutCount", "0");
+  }
+
+  async function resetPayouts() {
+    if (!activeTournament || saving) {
+      return;
+    }
+
+    const payouts = [];
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === activeTournament.id
+        ? { ...tournament, payoutPlaces: 0, payouts }
+        : tournament,
+    );
+
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setPayoutPlaceDrafts((drafts) => {
+        const nextDrafts = { ...drafts };
+        delete nextDrafts[activeTournament.id];
+        return nextDrafts;
+      });
+      setPayoutDrafts((drafts) => ({
+        ...drafts,
+        [activeTournament.id]: [],
+      }));
+    }
+  }
+
+  async function updateMaxPlayersPerTable(tournamentId, value) {
+    if (saving) {
+      return;
+    }
+
+    const parsedValue = Number(value);
+    const maxPlayersPerTable = Number.isFinite(parsedValue)
+      ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedValue)))
+      : 0;
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === tournamentId
+        ? { ...tournament, maxPlayersPerTable }
+        : tournament,
+    );
+
+    if (await persistTournamentData(nextTournaments, activeTournamentId)) {
+      setTableMaxDrafts((drafts) => {
+        const nextDrafts = { ...drafts };
+        delete nextDrafts[tournamentId];
+        return nextDrafts;
+      });
+    }
+  }
+
+  async function resetTables() {
+    if (!activeTournament || saving) {
+      return;
+    }
+
+    await updateMaxPlayersPerTable(activeTournament.id, "0");
+  }
+
   const activeTournament = tournaments.find(
     (tournament) => tournament.id === activeTournamentId,
   );
@@ -1034,6 +1189,7 @@ function App() {
         bustoutCount: undefined,
         payoutPlaces: undefined,
         payouts: undefined,
+        maxPlayersPerTable: undefined,
       })
     : "";
   const activeEntryCountDrafts = activeTournament
@@ -1115,6 +1271,53 @@ function App() {
         0,
     ) - bustoutCount,
   );
+  const parsedMaxPlayersPerTable = activeTournament
+    ? Number(
+        tableMaxDrafts[activeTournament.id] ??
+          activeTournament.maxPlayersPerTable ??
+          0,
+      )
+    : 0;
+  const maxPlayersPerTable = Number.isFinite(parsedMaxPlayersPerTable)
+    ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedMaxPlayersPerTable)))
+    : 0;
+  const requiredTableCount =
+    maxPlayersPerTable > 0
+      ? Math.ceil(remainingPlayers / maxPlayersPerTable)
+      : 0;
+  const largerTableSize =
+    requiredTableCount > 0
+      ? Math.ceil(remainingPlayers / requiredTableCount)
+      : null;
+  const smallerTableSize =
+    requiredTableCount > 0
+      ? Math.floor(remainingPlayers / requiredTableCount)
+      : null;
+  const largerTableCount =
+    requiredTableCount > 0
+      ? remainingPlayers % requiredTableCount || requiredTableCount
+      : 0;
+  const smallerTableCount = requiredTableCount - largerTableCount;
+  const tableRows = [
+    {
+      playersPerTable: largerTableCount > 0 ? largerTableSize : null,
+      count: largerTableCount,
+      total: (largerTableSize ?? 0) * largerTableCount,
+    },
+    {
+      playersPerTable: smallerTableCount > 0 ? smallerTableSize : null,
+      count: smallerTableCount,
+      total: (smallerTableSize ?? 0) * smallerTableCount,
+    },
+  ];
+  const totalPlayersAtTables = tableRows.reduce(
+    (total, row) => total + row.total,
+    0,
+  );
+  const totalTableCount = tableRows.reduce(
+    (total, row) => total + row.count,
+    0,
+  );
   const averageChipstack =
     remainingPlayers > 0
       ? Math.round(totalChipsInPlay / remainingPlayers)
@@ -1129,6 +1332,28 @@ function App() {
   const payoutPlaces = Number.isFinite(parsedPayoutPlaces)
     ? Math.min(1_000, Math.max(0, Math.floor(parsedPayoutPlaces)))
     : 0;
+  const startingPlayers = Number(
+    activeEntryCountDrafts.buyinCount ?? activeTournament?.buyinCount ?? 0,
+  );
+  const timerMessages = [
+    activeTournament?.name,
+    startingPlayers > 0
+      ? `Starting Players: ${startingPlayers.toLocaleString()}`
+      : "",
+    remainingPlayers > 0
+      ? `Remaining Players: ${remainingPlayers.toLocaleString()}`
+      : "",
+    totalPrizePool > 0
+      ? `Total Prize Pool: ${formatAmount(totalPrizePool)}`
+      : "",
+    averageChipstack > 0
+      ? `Average Stack: ${averageChipstack.toLocaleString()}`
+      : "",
+    payoutPlaces > 0 ? `Top ${payoutPlaces.toLocaleString()} Players Paid` : "",
+  ].filter(Boolean);
+  const activeTimerMessageIndex = timerMessages.length
+    ? timerMessageIndex % timerMessages.length
+    : 0;
   const payouts = activeTournament
     ? Array.from({ length: payoutPlaces }, (_, index) =>
         Number(
@@ -1139,6 +1364,16 @@ function App() {
       )
     : [];
   const payoutTotal = payouts.reduce((total, payout) => total + payout, 0);
+  const payoutIncrement =
+    totalPrizePool <= 10
+      ? 1
+      : totalPrizePool <= 100
+        ? 5
+        : totalPrizePool <= 200
+          ? 10
+          : totalPrizePool <= 1_000
+            ? 25
+            : 50;
   const payoutsMatchPrizePool =
     Math.round(payoutTotal * 100) === Math.round(totalPrizePool * 100);
   const totalDurationMs =
@@ -1190,28 +1425,24 @@ function App() {
       const targetByKey = new Map(
         targetChips.map((chip) => [chip.key, chip]),
       );
-      const nextChips = previousChips
-        .filter((chip) => targetByKey.has(chip.key))
-        .map((chip) => ({
-          ...targetByKey.get(chip.key),
-          isEntering: chip.isEntering,
-          isExiting: false,
-        }));
-      const existingKeys = new Set(nextChips.map((chip) => chip.key));
+      const previousByKey = new Map(
+        previousChips.map((chip) => [chip.key, chip]),
+      );
+      const nextChips = targetChips.map((chip) => ({
+        ...chip,
+        isEntering: previousByKey.get(chip.key)?.isEntering ?? true,
+        isExiting: false,
+      }));
+      const targetKeys = new Set(targetChips.map((chip) => chip.key));
       const exitingChips = previousChips
-        .filter((chip) => !targetByKey.has(chip.key))
+        .filter((chip) => !targetKeys.has(chip.key))
         .map((chip) => ({ ...chip, isEntering: false, isExiting: true }));
 
       if (exitingChips.length > 0) {
         return [...nextChips, ...exitingChips];
       }
 
-      return [
-        ...nextChips,
-        ...targetChips
-          .filter((chip) => !existingKeys.has(chip.key))
-          .map((chip) => ({ ...chip, isEntering: true, isExiting: false })),
-      ];
+      return nextChips;
     });
   }, [activeTournament, currentLevel?.index]);
 
@@ -1223,15 +1454,16 @@ function App() {
           return remainingChips;
         }
 
-        const existingKeys = new Set(
-          remainingChips.map((chip) => chip.key),
+        const remainingByKey = new Map(
+          remainingChips.map((chip) => [chip.key, chip]),
         );
-        return [
-          ...remainingChips,
-          ...timerChipsTargetRef.current
-            .filter((chip) => !existingKeys.has(chip.key))
-            .map((chip) => ({ ...chip, isEntering: true, isExiting: false })),
-        ];
+        return timerChipsTargetRef.current.map((chip) => ({
+          ...chip,
+          isEntering: remainingByKey.has(chip.key)
+            ? remainingByKey.get(chip.key).isEntering
+            : true,
+          isExiting: false,
+        }));
       });
     } else if (animationName === "timer-chip-add") {
       setTimerChips((chips) =>
@@ -1302,19 +1534,70 @@ function App() {
 
     const announcement = new window.SpeechSynthesisUtterance(text);
     announcement.volume = timerSettings.volume;
+    announcement.rate = timerSettings.announcementSpeed;
     window.speechSynthesis.speak(announcement);
   }
 
-  function playLevelAlarm(level) {
-    if (timerSettings.alarmSound === "off") {
-      speakLevelAnnouncement(level);
+  function speakCountdownWarning() {
+    if (!timerSettings.countdownWarningSpeechEnabled) {
+      return;
+    }
+
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      console.error("Speech synthesis is not available in this browser.");
+      return;
+    }
+
+    const text = timerSettings.countdownWarningAnnouncement.replace(
+      /\{seconds\}/g,
+      String(timerSettings.countdownWarningSeconds),
+    );
+    if (!text.trim()) {
+      return;
+    }
+
+    const announcement = new window.SpeechSynthesisUtterance(text);
+    announcement.volume = timerSettings.volume;
+    announcement.rate = timerSettings.announcementSpeed;
+    window.speechSynthesis.speak(announcement);
+  }
+
+  async function previewCountdownWarning() {
+    if (timerSettings.countdownWarningSound !== "off") {
+      prepareTimerAudio();
+      const audioContext = audioContextRef.current;
+      if (audioContext?.state === "suspended") {
+        try {
+          await audioContext.resume();
+        } catch (error) {
+          console.error("Could not start countdown warning preview.", error);
+          setTimerSettingsError("The countdown warning preview could not be played.");
+          return;
+        }
+      }
+    }
+
+    playLevelAlarm(
+      { smallBlind: 100, bigBlind: 200, ante: 25 },
+      timerSettings.countdownWarningSound,
+      speakCountdownWarning,
+    );
+  }
+
+  function playLevelAlarm(
+    level,
+    sound = timerSettings.alarmSound,
+    onComplete = () => speakLevelAnnouncement(level),
+  ) {
+    if (sound === "off") {
+      onComplete();
       return;
     }
 
     const audioContext = audioContextRef.current;
     if (!audioContext || audioContext.state !== "running") {
       console.error("Timer alarm audio is not available.");
-      speakLevelAnnouncement(level);
+      onComplete();
       return;
     }
 
@@ -1375,10 +1658,10 @@ function App() {
         { frequency: 175, start: 0, duration: 1.8, type: "triangle", volume: 0.16 },
       ],
     };
-    const notes = patterns[timerSettings.alarmSound];
+    const notes = patterns[sound];
     if (!notes) {
-      console.error("Unknown timer alarm sound.", timerSettings.alarmSound);
-      speakLevelAnnouncement(level);
+      console.error("Unknown timer alarm sound.", sound);
+      onComplete();
       return;
     }
 
@@ -1412,7 +1695,7 @@ function App() {
     }
 
     finalOscillator?.addEventListener("ended", () => {
-      speakLevelAnnouncement(level);
+      onComplete();
     });
   }
 
@@ -1444,7 +1727,7 @@ function App() {
     setElapsedMs(0);
     setStartedAt(null);
     setClockNowMs(0);
-  }, [activeTournamentKey]);
+  }, [activeTournamentId]);
 
   useEffect(() => {
     const previousLevel = previousLevelRef.current;
@@ -1467,6 +1750,47 @@ function App() {
   }, [activeTournamentKey, currentLevel?.index, startedAt, timerSettings]);
 
   useEffect(() => {
+    const levelKey =
+      activeTournamentId && currentLevel
+        ? `${activeTournamentId}:${currentLevel.index}`
+        : null;
+    const previousWarning = previousWarningLevelRef.current;
+    const warningThresholdMs =
+      timerSettings.countdownWarningSeconds * 1_000;
+    const sameLevel = previousWarning?.levelKey === levelKey;
+    let armed = sameLevel ? previousWarning.armed : true;
+
+    if (levelKey !== null) {
+      if (currentLevel.remainingMs > warningThresholdMs) {
+        armed = true;
+      } else if (
+        startedAt !== null &&
+        armed
+      ) {
+        playLevelAlarm(
+          currentLevel.level,
+          timerSettings.countdownWarningSound,
+          speakCountdownWarning,
+        );
+        armed = false;
+      }
+    } else {
+      armed = true;
+    }
+
+    previousWarningLevelRef.current = {
+      levelKey,
+      armed,
+    };
+  }, [
+    activeTournamentId,
+    currentLevel?.index,
+    currentLevel?.remainingMs,
+    startedAt,
+    timerSettings.countdownWarningSeconds,
+  ]);
+
+  useEffect(() => {
     if (startedAt === null) {
       return undefined;
     }
@@ -1476,6 +1800,42 @@ function App() {
     }, 250);
     return () => window.clearInterval(intervalId);
   }, [startedAt]);
+
+  useEffect(() => {
+    function updateKeepAwake() {
+      const enabled =
+        activeTab === "Timer" &&
+        startedAt !== null &&
+        document.visibilityState === "visible";
+      invoke("set_keep_awake", { enabled }).catch((error) => {
+        console.error("Could not update keep-awake state.", error);
+      });
+    }
+
+    function releaseKeepAwake() {
+      invoke("set_keep_awake", { enabled: false }).catch((error) => {
+        console.error("Could not release keep-awake state.", error);
+      });
+    }
+
+    updateKeepAwake();
+    document.addEventListener("visibilitychange", updateKeepAwake);
+    window.addEventListener("pagehide", releaseKeepAwake);
+
+    return () => {
+      document.removeEventListener("visibilitychange", updateKeepAwake);
+      window.removeEventListener("pagehide", releaseKeepAwake);
+    };
+  }, [activeTab, startedAt]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setTimerMessageIndex((index) =>
+        timerMessages.length ? (index + 1) % timerMessages.length : 0,
+      );
+    }, 10_000);
+    return () => window.clearInterval(intervalId);
+  }, [timerMessages.length]);
 
   useEffect(() => {
     if (
@@ -1504,6 +1864,18 @@ function App() {
     return () =>
       document.removeEventListener("fullscreenchange", updateFullscreenState);
   }, []);
+
+  useEffect(() => {
+    if (
+      activeTab !== "Timer" &&
+      document.fullscreenElement === timerPanelRef.current
+    ) {
+      document.exitFullscreen().catch((error) => {
+        console.error("Could not exit timer fullscreen after navigation.", error);
+        setTimerFullscreenError("Could not exit fullscreen mode.");
+      });
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (!timerIsFullscreen) {
@@ -1820,6 +2192,105 @@ function App() {
                   aria-label="Timer volume"
                 />
               </label>
+              <label className="settings-volume-control">
+                <span>Announcement Speed</span>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={timerSettings.announcementSpeed}
+                  disabled={!timerSettings.spokenAnnouncementEnabled}
+                  onChange={(event) =>
+                    setTimerSettings((current) => ({
+                      ...current,
+                      announcementSpeed: Number(event.target.value),
+                    }))
+                  }
+                  aria-label="Announcement speed"
+                />
+                <output>{timerSettings.announcementSpeed.toFixed(1)}×</output>
+              </label>
+            </div>
+            <div className="settings-countdown-warning">
+              <h3>Level countdown warning</h3>
+              <p>
+                Play once per level when the selected number of seconds remain.
+              </p>
+              <label className="form-field">
+                Seconds remaining
+                <input
+                  type="number"
+                  min="1"
+                  max="3600"
+                  step="1"
+                  value={timerSettings.countdownWarningSeconds}
+                  onChange={(event) =>
+                    setTimerSettings((current) => ({
+                      ...current,
+                      countdownWarningSeconds: Math.max(
+                        1,
+                        Math.min(3600, Math.floor(Number(event.target.value) || 1)),
+                      ),
+                    }))
+                  }
+                />
+              </label>
+              <label className="form-field">
+                Warning alarm
+                <select
+                  value={timerSettings.countdownWarningSound}
+                  onChange={(event) =>
+                    setTimerSettings((current) => ({
+                      ...current,
+                      countdownWarningSound: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="single-ding">Single ding</option>
+                  <option value="double-ding">Ding ding</option>
+                  <option value="triple-ding">Ding ding ding</option>
+                  <option value="alarm-clock">Alarm clock (beep beep beep)</option>
+                  <option value="hockey-horn">Hockey goal horn</option>
+                  <option value="train-whistle">Train whistle</option>
+                  <option value="ship-horn">Ship horn</option>
+                  <option value="off">Off</option>
+                </select>
+              </label>
+              <label className="settings-switch">
+                <span>Spoken countdown message</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={timerSettings.countdownWarningSpeechEnabled}
+                  onChange={(event) =>
+                    setTimerSettings((current) => ({
+                      ...current,
+                      countdownWarningSpeechEnabled: event.target.checked,
+                    }))
+                  }
+                  aria-label="Enable spoken countdown message"
+                />
+                <span className="settings-switch-track" aria-hidden="true" />
+              </label>
+              <label className="form-field">
+                Countdown message
+                <textarea
+                  rows="2"
+                  value={timerSettings.countdownWarningAnnouncement}
+                  disabled={!timerSettings.countdownWarningSpeechEnabled}
+                  title="Use {seconds} to insert the configured countdown."
+                  onChange={(event) =>
+                    setTimerSettings((current) => ({
+                      ...current,
+                      countdownWarningAnnouncement: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <button type="button" onClick={previewCountdownWarning}>
+                Test countdown warning
+              </button>
             </div>
             <p className="settings-save-status">
               Settings save automatically in the selected directory.
@@ -1889,7 +2360,7 @@ function App() {
                       />
                     </label>
                   </div>
-                  <div className="tournament-cost-field">
+                  <div className="tournament-cost-field" id="edit-entry-buyin">
                     <span
                       className="tournament-flag-spacer"
                       aria-hidden="true"
@@ -1925,7 +2396,7 @@ function App() {
                       />
                     </label>
                   </div>
-                  <div className="tournament-cost-field">
+                  <div className="tournament-cost-field" id="edit-entry-rebuy">
                     <label className="tournament-flag form-field">
                       <span>Rebuys Allowed?</span>
                       <input
@@ -1987,7 +2458,7 @@ function App() {
                       />
                     </label>
                   </div>
-                  <div className="tournament-cost-field">
+                  <div className="tournament-cost-field" id="edit-entry-addon">
                     <label className="tournament-flag form-field">
                       <span>Addons Allowed?</span>
                       <input
@@ -2053,7 +2524,7 @@ function App() {
 
                 <hr className="tournament-details-divider" />
 
-                <div className="levels-heading">
+                <div className="levels-heading" id="edit-entry-chips">
                   <h4>Available Chips</h4>
                   <button
                     type="button"
@@ -2225,7 +2696,25 @@ function App() {
                         <tr>
                           <th colSpan="4" scope="row">Totals</th>
                           <td className="numeric-column">
-                            {formatChipStackTotal(draft.chips)}
+                            <output className="chip-stack-value chip-stack-total">
+                              {draft.startingChipstack !== "" &&
+                                Number.isFinite(Number(draft.startingChipstack)) &&
+                                getChipStackSummary(draft.chips).hasQuantities &&
+                                !getChipStackSummary(draft.chips)
+                                  .hasUnspecifiedQuantities &&
+                                getChipStackSummary(draft.chips).total ===
+                                  Number(draft.startingChipstack) && (
+                                  <span
+                                    className="chip-stack-match"
+                                    role="img"
+                                    aria-label="Per-player chipstack matches starting chipstack"
+                                    title="Per-player chipstack matches starting chipstack"
+                                  >
+                                    ✓
+                                  </span>
+                                )}
+                              {formatChipStackTotal(draft.chips)}
+                            </output>
                           </td>
                           <td className="numeric-column">
                             {getMaxChipSupportedPlayers(draft.chips) == null
@@ -2244,16 +2733,27 @@ function App() {
                 )}
                 <hr className="tournament-details-divider" />
 
-                <div className="levels-heading">
+                <div className="levels-heading" id="edit-entry-levels">
                   <h4>Levels</h4>
                   <button
                     type="button"
                     disabled={saving}
                     onClick={() =>
-                      setDraft((current) => ({
-                        ...current,
-                        levels: [...current.levels, createEmptyLevel()],
-                      }))
+                      setDraft((current) => {
+                        const previousLevel = [...current.levels]
+                          .reverse()
+                          .find((level) => !level.isBreak);
+                        return {
+                          ...current,
+                          levels: [
+                            ...current.levels,
+                            createNextLevel(
+                              previousLevel,
+                              current.levels.at(-1)?.duration ?? "",
+                            ),
+                          ],
+                        };
+                      })
                     }
                   >
                     Add level
@@ -2803,34 +3303,50 @@ function App() {
               activeTab === "Timer" ? (
                 <div className="timer-display">
                   <div className="timer-current-blinds-row">
-                    <div className="timer-blinds-group">
+                    <div
+                      className="timer-blinds-group"
+                      title="Double-click to edit the blinds schedule"
+                      onDoubleClick={() =>
+                        editTournamentSection(
+                          activeTournament.id,
+                          "edit-entry-levels",
+                        )
+                      }
+                    >
                       <p className="timer-blinds" aria-hidden={!currentLevel}>
                         {!currentLevel
                           ? "\u00a0"
                           : currentLevel.level.isBreak
                             ? "BREAK"
-                            : `${formatChipNumber(currentLevel.level.smallBlind ?? 0)}/${formatChipNumber(currentLevel.level.bigBlind ?? 0)}${
-                                Number(currentLevel.level.ante ?? 0) > 0
-                                  ? ` + ${formatChipNumber(currentLevel.level.ante)}`
-                                  : ""
-                              }`}
+                            : formatBlinds(
+                                currentLevel.level.smallBlind,
+                                currentLevel.level.bigBlind,
+                                currentLevel.level.ante,
+                              )}
                       </p>
                       <p className="timer-blinds-label">Current Blinds</p>
                     </div>
                     {currentLevel && (
-                      <div className="timer-next-blinds-group">
+                      <div
+                        className="timer-next-blinds-group"
+                        title="Double-click to edit the blinds schedule"
+                        onDoubleClick={() =>
+                          editTournamentSection(
+                            activeTournament.id,
+                            "edit-entry-levels",
+                          )
+                        }
+                      >
                         <p className="timer-next-blinds">
                           {!nextLevel
                             ? "Last Level"
                             : nextLevel.level.isBreak
                               ? "BREAK"
-                              : `${
-                                  formatChipNumber(nextLevel.level.smallBlind ?? 0)
-                                }/${formatChipNumber(nextLevel.level.bigBlind ?? 0)}${
-                                  Number(nextLevel.level.ante ?? 0) > 0
-                                    ? ` + ${formatChipNumber(nextLevel.level.ante)}`
-                                    : ""
-                                }`}
+                              : formatBlinds(
+                                  nextLevel.level.smallBlind,
+                                  nextLevel.level.bigBlind,
+                                  nextLevel.level.ante,
+                                )}
                         </p>
                         <p className="timer-next-blinds-label">Next Blinds</p>
                       </div>
@@ -2842,6 +3358,12 @@ function App() {
                         key={chip.key}
                         chip={chip}
                         onAnimationEnd={finishTimerChipAnimation}
+                        onDoubleClick={() =>
+                          editTournamentSection(
+                            activeTournament.id,
+                            "edit-entry-chips",
+                          )
+                        }
                       />
                     ))}
                   </div>
@@ -2906,6 +3428,14 @@ function App() {
                           />
                         </svg>
                         <TimerClock remainingMs={currentLevel.remainingMs} />
+                        <div className="timer-message" aria-live="polite">
+                          <span
+                            key={activeTimerMessageIndex}
+                            className="timer-message-text"
+                          >
+                            {timerMessages[activeTimerMessageIndex]}
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <p className="timer-complete">
@@ -2919,18 +3449,43 @@ function App() {
                   <div className="timer-entry-controls">
                     <div className="timer-entry-heading">
                       <h3>Entries</h3>
-                      <button
-                        className="timer-entry-reset"
-                        type="button"
-                        onClick={resetEntryCounts}
-                        disabled={saving}
-                        aria-label="Reset entries"
-                        title="Reset entries"
-                      >
-                        <TimerIcon name="reset" />
-                      </button>
+                      <div className="timer-entry-heading-actions">
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={resetEntryCounts}
+                          disabled={saving}
+                          aria-label="Reset entries"
+                          title="Reset entries"
+                        >
+                          <TimerIcon name="reset" />
+                        </button>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() =>
+                            setEntriesCollapsed((collapsed) => !collapsed)
+                          }
+                          aria-expanded={!entriesCollapsed}
+                          aria-controls="timer-entry-table"
+                          aria-label={
+                            entriesCollapsed
+                              ? "Expand entries"
+                              : "Collapse entries"
+                          }
+                          title={
+                            entriesCollapsed
+                              ? "Expand entries"
+                              : "Collapse entries"
+                          }
+                        >
+                          <TimerIcon
+                            name={entriesCollapsed ? "expand" : "collapse"}
+                          />
+                        </button>
+                      </div>
                     </div>
-                    <table className="timer-entry-table">
+                    <table className="timer-entry-table" id="timer-entry-table">
                       <thead>
                         <tr>
                           <th scope="col">Type</th>
@@ -2939,10 +3494,26 @@ function App() {
                           <th scope="col">Chips</th>
                         </tr>
                       </thead>
+                      {!entriesCollapsed && (
                       <tbody>
                         {entryRows.map((entry) => (
                           <tr key={entry.countField}>
-                            <th scope="row">{entry.label}</th>
+                            <th
+                              scope="row"
+                              onDoubleClick={() =>
+                                editTournamentSection(
+                                  activeTournament.id,
+                                  entry.countField === "buyinCount"
+                                    ? "edit-entry-buyin"
+                                    : entry.countField === "rebuyCount"
+                                      ? "edit-entry-rebuy"
+                                      : "edit-entry-addon",
+                                )
+                              }
+                              title={`Double-click to edit ${entry.label.toLowerCase()} settings`}
+                            >
+                              {entry.label}
+                            </th>
                             <td>
                               <input
                                 type="number"
@@ -2971,10 +3542,7 @@ function App() {
                               />
                             </td>
                             <td>
-                              {entry.contribution.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
+                              {formatAmount(entry.contribution)}
                             </td>
                             <td>{entry.chipsInPlay.toLocaleString()}</td>
                           </tr>
@@ -3048,24 +3616,72 @@ function App() {
                           </td>
                         </tr>
                       </tbody>
+                      )}
                       <tfoot>
                         <tr>
                           <th colSpan="2" scope="row">
                             Total
                           </th>
-                          <td>
-                            {totalPrizePool.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
+                          <td>{formatAmount(totalPrizePool)}</td>
                           <td>{totalChipsInPlay.toLocaleString()}</td>
                         </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                  <div className="timer-bustout-controls timer-bustout-section">
+                    <div className="timer-entry-heading">
+                      <h3>Bustouts</h3>
+                      <div className="timer-entry-heading-actions">
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={resetBustoutCount}
+                          disabled={saving}
+                          aria-label="Reset bustouts"
+                          title="Reset bustouts"
+                        >
+                          <TimerIcon name="reset" />
+                        </button>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() =>
+                            setBustoutsCollapsed((collapsed) => !collapsed)
+                          }
+                          aria-expanded={!bustoutsCollapsed}
+                          aria-controls="timer-bustout-table"
+                          aria-label={
+                            bustoutsCollapsed
+                              ? "Expand bustouts"
+                              : "Collapse bustouts"
+                          }
+                          title={
+                            bustoutsCollapsed
+                              ? "Expand bustouts"
+                              : "Collapse bustouts"
+                          }
+                        >
+                          <TimerIcon
+                            name={bustoutsCollapsed ? "expand" : "collapse"}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <table
+                      className="timer-bustout-table"
+                      id="timer-bustout-table"
+                    >
+                      <thead>
                         <tr>
-                          <th scope="row">Bustouts</th>
-                          <td>
+                          <th scope="col">Busted</th>
+                          <th scope="col">Remaining</th>
+                          <th scope="col">Average Chipstack</th>
+                        </tr>
+                      </thead>
+                      <tfoot>
+                        <tr>
+                          <th scope="row">
                             <input
-                              className="timer-entry-count-input"
                               type="number"
                               min="0"
                               max={Math.max(
@@ -3102,53 +3718,88 @@ function App() {
                                 )
                               }
                             />
-                          </td>
-                          <td />
+                          </th>
+                          <td>{remainingPlayers.toLocaleString()}</td>
                           <td>{averageChipstack.toLocaleString()}</td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
-                  <div className="timer-payout-controls">
+                  <div className="timer-payout-controls timer-payout-section">
                     <div className="timer-entry-heading">
                       <h3>Payouts</h3>
-                      <label className="timer-payout-places">
-                        <span>Players paid</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max="1000"
-                          step="1"
-                          value={
-                            payoutPlaceDrafts[activeTournament.id] ??
-                            activeTournament.payoutPlaces ??
-                            0
-                          }
+                      <div className="timer-entry-heading-actions">
+                        <label className="timer-payout-places">
+                          <span>Players paid</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max="1000"
+                            step="1"
+                            value={
+                              payoutPlaceDrafts[activeTournament.id] ??
+                              activeTournament.payoutPlaces ??
+                              0
+                            }
+                            disabled={saving}
+                            aria-label="Number of players paid"
+                            onChange={(event) =>
+                              setPayoutPlaceDrafts((drafts) => ({
+                                ...drafts,
+                                [activeTournament.id]: event.target.value,
+                              }))
+                            }
+                            onBlur={(event) =>
+                              updatePayoutPlaces(
+                                activeTournament.id,
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </label>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={resetPayouts}
                           disabled={saving}
-                          aria-label="Number of players paid"
-                          onChange={(event) =>
-                            setPayoutPlaceDrafts((drafts) => ({
-                              ...drafts,
-                              [activeTournament.id]: event.target.value,
-                            }))
+                          aria-label="Reset payouts"
+                          title="Reset payouts"
+                        >
+                          <TimerIcon name="reset" />
+                        </button>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() =>
+                            setPayoutsCollapsed((collapsed) => !collapsed)
                           }
-                          onBlur={(event) =>
-                            updatePayoutPlaces(
-                              activeTournament.id,
-                              event.target.value,
-                            )
+                          aria-expanded={!payoutsCollapsed}
+                          aria-controls="timer-payout-table"
+                          aria-label={
+                            payoutsCollapsed
+                              ? "Expand payouts"
+                              : "Collapse payouts"
                           }
-                        />
-                      </label>
+                          title={
+                            payoutsCollapsed
+                              ? "Expand payouts"
+                              : "Collapse payouts"
+                          }
+                        >
+                          <TimerIcon
+                            name={payoutsCollapsed ? "expand" : "collapse"}
+                          />
+                        </button>
+                      </div>
                     </div>
-                    <table className="timer-payout-table">
-                      <thead>
+                    <table className="timer-payout-table" id="timer-payout-table">
+                      {!payoutsCollapsed && <thead>
                         <tr>
                           <th scope="col">Place</th>
                           <th scope="col">Payout</th>
                         </tr>
-                      </thead>
-                      <tbody>
+                      </thead>}
+                      {!payoutsCollapsed && <tbody>
                         {payouts.map((payout, index) => (
                           <tr key={index}>
                             <th scope="row">{index + 1}</th>
@@ -3156,7 +3807,7 @@ function App() {
                               <input
                                 type="number"
                                 min="0"
-                                step="5"
+                                step={payoutIncrement}
                                 value={
                                   payoutDrafts[activeTournament.id]?.[index] ??
                                   activeTournament.payouts?.[index] ??
@@ -3185,36 +3836,114 @@ function App() {
                             </td>
                           </tr>
                         ))}
-                      </tbody>
+                      </tbody>}
                       <tfoot>
                         <tr>
                           <th scope="row">Total</th>
-                          <td>
-                            {payoutTotal.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
+                          <td className="timer-payout-total">
+                            {payoutsMatchPrizePool && (
+                              <span
+                                className="timer-payout-match"
+                                role="img"
+                                aria-label="Payouts match the prize pool"
+                                title="Payouts match the prize pool"
+                              >
+                                ✓
+                              </span>
+                            )}
+                            {formatAmount(payoutTotal)}
                           </td>
                         </tr>
                       </tfoot>
                     </table>
-                    <p
-                      className={
-                        payoutsMatchPrizePool
-                          ? "timer-payout-status is-matched"
-                          : "timer-payout-status is-mismatched"
-                      }
-                      role={payoutsMatchPrizePool ? "status" : "alert"}
-                    >
-                      {payoutsMatchPrizePool
-                        ? "Payouts match the prize pool."
-                        : `Payouts differ from the prize pool by ${Math.abs(
-                            payoutTotal - totalPrizePool,
-                          ).toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}.`}
-                    </p>
+                  </div>
+                  <div className="timer-tables-controls">
+                    <div className="timer-entry-heading">
+                      <h3>Tables</h3>
+                      <div className="timer-entry-heading-actions">
+                        <label className="timer-payout-places">
+                          <span>Max/Table</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={
+                              tableMaxDrafts[activeTournament.id] ??
+                              activeTournament.maxPlayersPerTable ??
+                              0
+                            }
+                            disabled={saving}
+                            aria-label="Maximum players per table"
+                            onChange={(event) =>
+                              setTableMaxDrafts((drafts) => ({
+                                ...drafts,
+                                [activeTournament.id]: event.target.value,
+                              }))
+                            }
+                            onBlur={(event) =>
+                              updateMaxPlayersPerTable(
+                                activeTournament.id,
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </label>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={resetTables}
+                          disabled={saving}
+                          aria-label="Reset tables"
+                          title="Reset tables"
+                        >
+                          <TimerIcon name="reset" />
+                        </button>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() =>
+                            setTablesCollapsed((collapsed) => !collapsed)
+                          }
+                          aria-expanded={!tablesCollapsed}
+                          aria-controls="timer-tables-table"
+                          aria-label={
+                            tablesCollapsed ? "Expand tables" : "Collapse tables"
+                          }
+                          title={
+                            tablesCollapsed ? "Expand tables" : "Collapse tables"
+                          }
+                        >
+                          <TimerIcon
+                            name={tablesCollapsed ? "expand" : "collapse"}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <table className="timer-tables-table" id="timer-tables-table">
+                      {!tablesCollapsed && <tbody>
+                        {tableRows.map((row, index) => (
+                          <tr key={index}>
+                            <td className="timer-tables-description">
+                              {row.count > 0
+                                ? `${row.count.toLocaleString()} ${
+                                    row.count === 1 ? "Table" : "Tables"
+                                  } of ${row.playersPerTable?.toLocaleString()}`
+                                : "—"}
+                            </td>
+                            <td>{row.total.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>}
+                      <tfoot>
+                        <tr>
+                          <th scope="row">
+                            {totalTableCount.toLocaleString()}{" "}
+                            {totalTableCount === 1 ? "Table" : "Tables"}
+                          </th>
+                          <td>{totalPlayersAtTables.toLocaleString()}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                   </div>
                   <div className="timer-bottom-center">
