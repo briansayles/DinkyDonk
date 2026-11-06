@@ -1,0 +1,1123 @@
+.logo.vite:hover {
+  filter: drop-shadow(0 0 2em #747bff);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafb);
+}
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.container {
+  margin: 0;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 2vw, 2rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.tab-navigation {
+  display: flex;
+  width: 100%;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #d5d5d5;
+}
+
+.tab-button {
+  flex: 1 1 0;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 6px 6px 0 0;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tab-button:hover {
+  border-color: #9aa8d8;
+}
+
+.tab-button.active {
+  border-bottom-color: #396cd8;
+  color: #2856b8;
+}
+
+.tab-button:focus-visible {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
+}
+
+.tab-panel {
+  align-self: stretch;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border: 1px solid #d5d5d5;
+  border-radius: 8px;
+}
+
+.timer-tab-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 0.5rem 1rem;
+}
+
+.timer-tab-panel > h2 {
+  flex: 0 0 auto;
+  margin-bottom: 0.25rem;
+  font-size: clamp(1.1rem, 3.5vh, 2rem);
+}
+
+.timer-panel-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.tab-panel h2 {
+  margin-top: 0;
+}
+
+.tournament-manager {
+  text-align: left;
+}
+
+.active-structure-panel {
+  text-align: left;
+}
+
+.active-structure-panel h3 {
+  margin-top: 0;
+}
+
+.timer-display {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-areas:
+    "current current current"
+    "left-chips clock right-middle"
+    "left-chips bottom right-bottom";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 4fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  column-gap: clamp(0.25rem, 1vw, 1rem);
+  row-gap: clamp(0.15rem, 0.75vh, 0.5rem);
+  padding: clamp(0.25rem, 0.75vh, 0.75rem) 0.5rem;
+  text-align: center;
+}
+
+.timer-current-blinds-row {
+  display: grid;
+  grid-area: current;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(0.15rem, 0.75vh, 0.5rem);
+  border: 1px solid #9aa8d8;
+}
+
+.timer-clock-area {
+  display: flex;
+  grid-area: clock;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.15rem, 0.75vh, 0.5rem);
+  border: 1px solid #9aa8d8;
+}
+
+.timer-grid-spacer {
+  min-width: 0;
+  border: 1px solid #9aa8d8;
+}
+
+.timer-left-chips {
+  display: flex;
+  grid-area: left-chips;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.35rem, 1vh, 0.75rem);
+  padding: 0.5rem;
+  border: 1px solid #9aa8d8;
+}
+
+.timer-right-middle {
+  grid-area: right-middle;
+}
+
+.timer-right-bottom {
+  grid-area: right-bottom;
+}
+
+.timer-chip {
+  display: grid;
+  width: min(100%, 14.4vh, 8rem);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0.3rem;
+  border: 0.35rem dashed #fff;
+  border-radius: 50%;
+  background-color: var(--chip-color);
+  box-shadow:
+    inset 0 0 0 0.15rem rgba(0, 0, 0, 0.35),
+    0 2px 4px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: clamp(0.7rem, 1.92vh, 1.2rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+}
+
+.timer-chip-coloring-up {
+  animation: timer-chip-color-up 4s linear infinite;
+}
+
+.timer-chip-entering {
+  animation: timer-chip-add 0.5s ease-out both;
+}
+
+.timer-chip-removing {
+  animation: timer-chip-remove 0.5s ease-in forwards;
+}
+
+@keyframes timer-chip-add {
+  from {
+    opacity: 0;
+    transform: translateX(-1rem) scale(0.7);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes timer-chip-remove {
+  from {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-1rem) scale(0.7);
+  }
+}
+
+@keyframes timer-chip-color-up {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.timer-bottom-center {
+  display: flex;
+  grid-area: bottom;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(0.15rem, 0.75vh, 0.5rem);
+  border: 1px solid #9aa8d8;
+}
+
+.timer-blinds-group,
+.timer-next-blinds-group {
+  min-width: 0;
+  flex: 0 0 auto;
+  text-align: center;
+}
+
+.timer-blinds {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 1.1em;
+  padding: 0 0.2em 0.02em;
+  border-bottom: 1px solid currentColor;
+  margin: 0 auto;
+  font-size: clamp(1.75rem, 16vh, 16rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.timer-blinds-label,
+.timer-next-blinds-label {
+  margin: 0.15rem 0 0;
+  font-size: clamp(0.85rem, 2vh, 1.25rem);
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+.timer-countdown {
+  position: relative;
+  display: grid;
+  width: min(100%, 48vh, 36rem);
+  max-height: 100%;
+  aspect-ratio: 1;
+  flex: 0 1 auto;
+  place-items: center;
+  container-type: inline-size;
+}
+
+.timer-progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-progress-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.timer-progress-track {
+  stroke: rgba(128, 128, 128, 0.2);
+}
+
+.timer-progress-value {
+  stroke-dasharray: 289.03;
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 0.25s linear,
+    stroke 0.25s ease;
+}
+
+.timer-progress-green .timer-progress-value {
+  stroke: #36a853;
+}
+
+.timer-progress-yellow .timer-progress-value {
+  stroke: #e5b323;
+}
+
+.timer-progress-red .timer-progress-value {
+  stroke: #dc3545;
+}
+
+.timer-clock {
+  z-index: 1;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0.2em;
+  font-size: clamp(1.5rem, 28cqi, 12rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.1;
+  flex: 0 0 auto;
+}
+
+.timer-next-blinds {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 1.1em;
+  padding: 0 0.2em 0.02em;
+  border-bottom: 1px solid currentColor;
+  margin: 0 auto;
+  font-size: clamp(0.875rem, 8vh, 8rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.05;
+  opacity: 0.75;
+}
+
+.timer-complete {
+  margin: 1.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.timer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  padding: 0;
+  border-radius: 50%;
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+.timer-controls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+.timer-controls .timer-toggle {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.timer-icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.timer-toggle .timer-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.timer-toggle:focus-visible,
+.timer-controls button:focus-visible {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
+}
+
+.timer-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  margin-top: 0;
+}
+
+.timer-volume-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.25rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.timer-volume-control input {
+  width: 6rem;
+  padding: 0;
+  margin: 0;
+  accent-color: #396cd8;
+}
+
+.tournament-heading,
+.levels-heading,
+.tournament-card-heading,
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tournament-heading {
+  margin-bottom: 1.5rem;
+}
+
+.tournament-heading p,
+.empty-state {
+  margin: 0;
+}
+
+.storage-error {
+  padding: 0.75rem;
+  border: 1px solid #c33;
+  border-radius: 6px;
+  margin: 0 0 1rem;
+  color: #a32121;
+}
+
+.tournament-form,
+.tournament-card {
+  padding: 1rem;
+  border: 1px solid #d5d5d5;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.tournament-card {
+  background-color: #efefef;
+}
+
+.tournament-form h3,
+.tournament-card h3 {
+  margin-top: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-color: #b8b8b8;
+  box-shadow: none;
+}
+
+.form-field input:disabled,
+.form-field textarea:disabled,
+.tournament-chip-editor-table input:disabled,
+.tournament-level-editor-table input:disabled {
+  border-color: rgba(127, 127, 127, 0.45);
+  color: #777;
+  background-color: transparent;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.form-field textarea {
+  resize: vertical;
+}
+
+.tournament-details-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.tournament-cost-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tournament-flag-spacer {
+  min-height: 1.5rem;
+}
+
+.tournament-details-divider {
+  border: 0;
+  border-top: 1px solid #d5d5d5;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.tournament-chip-editor-table {
+  min-width: 64rem;
+  table-layout: fixed;
+}
+
+.tournament-level-editor-table {
+  min-width: 100%;
+}
+
+.tournament-chip-editor-table th:nth-child(1),
+.tournament-chip-editor-table td:nth-child(1) {
+  width: 5rem;
+}
+
+.tournament-chip-editor-table th:nth-child(2),
+.tournament-chip-editor-table td:nth-child(2) {
+  width: 9.5rem;
+}
+
+.tournament-chip-editor-table th:nth-child(3),
+.tournament-chip-editor-table td:nth-child(3),
+.tournament-chip-editor-table th:nth-child(4),
+.tournament-chip-editor-table td:nth-child(4) {
+  width: 9rem;
+}
+
+.tournament-chip-editor-table th:nth-child(5),
+.tournament-chip-editor-table td:nth-child(5),
+.tournament-chip-editor-table th:nth-child(6),
+.tournament-chip-editor-table td:nth-child(6) {
+  width: 12rem;
+}
+
+.tournament-chip-editor-table th:nth-child(7),
+.tournament-chip-editor-table td:nth-child(7) {
+  width: 7.5rem;
+}
+
+.tournament-chip-editor-table td,
+.tournament-level-editor-table td {
+  vertical-align: middle;
+}
+
+.tournament-chip-editor-table th.numeric-column,
+.tournament-chip-editor-table td.numeric-column {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-chip-editor-table td .chip-stack-value {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.tournament-chip-editor-table td .chip-supported-value {
+  padding-right: 0.65rem;
+}
+
+.tournament-chip-editor-table td input:not([type="color"]),
+.tournament-level-editor-table td input {
+  width: 100%;
+  min-width: 6rem;
+  padding: 0.5rem 0.65rem;
+}
+
+.tournament-chip-editor-table td input[type="number"],
+.tournament-level-editor-table td input[type="number"] {
+  padding-right: 0.65rem;
+}
+
+.tournament-chip-editor-table td input[type="number"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-level-editor-table td input[type="number"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-chip-editor-table td input[type="color"] {
+  width: 4rem;
+  min-height: 2.75rem;
+  padding: 0.2rem;
+}
+
+.chip-stack-value {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  width: 100%;
+  padding: 0.6em 1.2em;
+  overflow: hidden;
+  border: 1px solid rgba(127, 127, 127, 0.45);
+  border-radius: 8px;
+  color: inherit;
+  background-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tournament-flag {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tournament-flag input {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 1rem;
+  text-align: left;
+}
+
+.settings-test-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.settings-volume-control {
+  display: inline-flex;
+  min-width: min(100%, 16rem);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-volume-control input {
+  width: 10rem;
+  padding: 0;
+  margin: 0;
+  accent-color: #396cd8;
+}
+
+.settings-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.settings-switch input {
+  appearance: none;
+  position: relative;
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  margin: 0;
+  background: #888;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.settings-switch input::before {
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #fff;
+  content: "";
+  transition: transform 0.2s;
+}
+
+.settings-switch input:checked {
+  background: #396cd8;
+}
+
+.settings-switch input:checked::before {
+  transform: translateX(1.25rem);
+}
+
+.settings-switch input:focus-visible {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
+}
+
+.settings-save-status {
+  justify-self: end;
+  margin: 0;
+  color: #555;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.levels-heading {
+  margin: 1rem 0 0.5rem;
+}
+
+.levels-heading h4 {
+  margin: 0;
+}
+
+.tournament-level-editor-table {
+  min-width: 68rem;
+}
+
+.level-action-buttons {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.tournament-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tournament-list {
+  margin-top: 1rem;
+}
+
+.tournament-card-heading h3 {
+  margin-bottom: 0;
+  font-size: 1.5rem;
+}
+
+.tournament-card-heading {
+  justify-content: flex-start;
+}
+
+.tournament-card-heading h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.tournament-card-heading-spacer {
+  flex: 1 1 auto;
+}
+
+.tournament-card-toggle {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+}
+
+.tournament-card-toggle:hover,
+.tournament-card-toggle:active {
+  background: transparent;
+}
+
+.tournament-card-chevron {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease;
+}
+
+.tournament-card-chevron.expanded {
+  transform: rotate(225deg);
+}
+
+.tournament-card-heading > button:first-of-type {
+  flex: 0 0 auto;
+}
+
+.tournament-card-heading > .tournament-card-toggle {
+  margin-left: 0;
+}
+
+.tournament-card-heading > .tournament-card-toggle:hover,
+.tournament-card-heading > .tournament-card-toggle:active {
+  border-color: transparent;
+  background: transparent;
+}
+
+.tournament-card-content {
+  margin-top: 0.75rem;
+}
+
+.tournament-card-section-title {
+  padding-top: 0.75rem;
+  border-top: 1px solid #d5d5d5;
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.tournament-card-content > .tournament-card-section-title:first-child {
+  margin-top: 0;
+}
+
+.tournament-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+  text-align: left;
+}
+
+.tournament-details div {
+  min-width: 0;
+}
+
+.tournament-details dt {
+  font-weight: 600;
+}
+
+.tournament-details dd {
+  margin: 0.2rem 0 0;
+}
+
+.tournament-cost-description {
+  display: block;
+  margin-top: 0.25rem;
+  white-space: pre-line;
+}
+
+.tournament-chips {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.tournament-chip-table-wrapper {
+  overflow-x: auto;
+}
+
+.tournament-chip-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tournament-chip-table th,
+.tournament-chip-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #d5d5d5;
+}
+
+.tournament-chip-table th {
+  font-weight: 600;
+}
+
+.tournament-chip-table .numeric-column,
+.tournament-level-table .numeric-column {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tournament-chip-table tfoot th,
+.tournament-chip-table tfoot td {
+  border-top: 2px solid #b8b8b8;
+  border-bottom: 0;
+  font-weight: 700;
+}
+
+.tournament-chip-table tfoot th {
+  text-align: right;
+}
+
+.chip-color-swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid #777;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.tournament-level-table-wrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.tournament-level-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tournament-level-table th,
+.tournament-level-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #d5d5d5;
+}
+
+.tournament-level-table thead th,
+.tournament-level-table tbody th {
+  font-weight: 600;
+}
+
+.level-numeric-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip-color-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-right: 0.75rem;
+}
+
+.danger-button {
+  color: #a32121;
+}
+
+.active-tournament-button,
+.active-tournament-button:disabled {
+  border-color: #3c8c4a;
+  background-color: #dff2e2;
+  color: #205b2b;
+  opacity: 1;
+}
+
+.form-actions {
+  justify-content: flex-start;
+  margin-top: 1rem;
+}
+
+.tournament-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.tournament-form-actions > .form-actions {
+  margin-top: 0;
+  margin-left: auto;
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 0.75rem;
+  }
+
+  .timer-controls {
+    gap: 0.35rem;
+  }
+
+  .timer-controls button {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .timer-controls .timer-toggle {
+    width: 3.25rem;
+    height: 3.25rem;
+  }
+
+  .timer-volume-control {
+    gap: 0.2rem;
+    font-size: 0.7rem;
+  }
+
+  .timer-volume-control input {
+    width: 4rem;
+  }
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: 0.75s;
+}
+
+.logo.tauri:hover {
+  filter: drop-shadow(0 0 2em #24c8db);
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+h1 {
+  text-align: center;
+  font-size: 1rem;
+}
+
+input,
+button,
+select,
+textarea {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  color: #0f0f0f;
+  background-color: #ffffff;
+  transition: border-color 0.25s;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+}
+
+input[type="number"] {
+  padding-right: 1.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  margin-left: 1ch;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #396cd8;
+}
+button:active {
+  border-color: #396cd8;
+  background-color: #e8e8e8;
+}
+
+input,
+button,
+select,
+textarea {
+  outline: none;
+}
+
+#greet-input {
+  margin-right: 5px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f6f6f6;
+    background-color: #2f2f2f;
+  }
+
+  a:hover {
+    color: #24c8db;
+  }
+
+  input,
+  button,
+  select,
+  textarea {
+    color: #ffffff;
+    background-color: #0f0f0f98;
+  }
+
+  .tournament-card {
+    background-color: #383838;
+  }
+
+  .form-field input:disabled,
+  .form-field textarea:disabled,
+  .tournament-chip-editor-table input:disabled,
+  .tournament-level-editor-table input:disabled,
+  .chip-stack-value {
+    border-color: rgba(200, 200, 200, 0.25);
+    color: #aaa;
+  }
+
+  .settings-save-status {
+    color: #c4c4c4;
+  }
+  button:active {
+    background-color: #0f0f0f69;
+  }
+}
