@@ -30,7 +30,7 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
         return;
       }
 
-      const maxFontSize = diameter * 0.28;
+      const maxFontSize = diameter * 0.4;
       const fontSize = Math.min(maxFontSize, (diameter * 0.7 * referenceSize) / textWidth);
       element.style.fontSize = `${fontSize}px`;
     });
@@ -52,7 +52,11 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
       ]
         .filter(Boolean)
         .join(" ")}
-      style={{ "--chip-color": chip.color }}
+      style={{ 
+        "--chip-color": chip.color, 
+        "--chip-edge-spot-color": chip.color?.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff",
+        "--chip-text-color": chip.color?.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff" 
+      }}
       onAnimationEnd={(event) => onAnimationEnd(chip.key, event.animationName)}
       role="img"
       aria-hidden={chip.isExiting}
