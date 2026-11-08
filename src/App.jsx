@@ -213,6 +213,9 @@ function App() {
       chips: sortChips(
         draft.chips.map((chip) => ({
           color: chip.color,
+          edgeSpotColor: chip.edgeSpotColor ?? "#000000",
+          textColor: chip.textColor ?? "#ffffff",
+          edgeSpotQuantity: chip.edgeSpotQuantity === "" ? null : Number(chip.edgeSpotQuantity),
           denomination: Number(chip.denomination),
           availableQuantity:
             chip.availableQuantity === ""

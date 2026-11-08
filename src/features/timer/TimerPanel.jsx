@@ -54,8 +54,9 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
         .join(" ")}
       style={{ 
         "--chip-color": chip.color, 
-        "--chip-edge-spot-color": chip.color?.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff",
-        "--chip-text-color": chip.color?.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff" 
+        "--chip-edge-spot-color": chip.edgeSpotColor ?? "#ffffff",
+        "--chip-text-color": chip.textColor ?? "#ffffff",
+        "--chip-edge-spot-quantity": chip.edgeSpotQuantity ?? 6,
       }}
       onAnimationEnd={(event) => onAnimationEnd(chip.key, event.animationName)}
       role="img"

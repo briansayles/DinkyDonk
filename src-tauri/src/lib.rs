@@ -85,6 +85,12 @@ struct TournamentChip {
     available_quantity: Option<u32>,
     #[serde(default)]
     quantity_per_player: Option<u32>,
+    #[serde(default)]
+    edge_spot_color: Option<String>,
+    #[serde(default)]
+    edge_spot_quantity: Option<u32>,
+    #[serde(default)]
+    text_color: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]

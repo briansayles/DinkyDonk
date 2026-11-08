@@ -255,6 +255,9 @@ export default function TournamentEditor({
                       <thead>
                         <tr>
                           <th scope="col">Color</th>
+                          <th scope="col">Text Color</th>
+                          <th scope="col">Edge Spot Color</th>
+                          <th scope="col">Edge Spot Quantity</th>
                           <th className="numeric-column" scope="col">Denomination</th>
                           <th className="numeric-column" scope="col">Available</th>
                           <th className="numeric-column" scope="col">Per player</th>
@@ -278,6 +281,65 @@ export default function TournamentEditor({
                                     chips: current.chips.map((item, chipIndex) =>
                                       chipIndex === index
                                         ? { ...item, color: event.target.value }
+                                        : item,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="color"
+                                value={chip.textColor}
+                                disabled={saving}
+                                aria-label={`Chip ${index + 1} text color`}
+                                onChange={(event) =>
+                                  setDraft((current) => ({
+                                    ...current,
+                                    chips: current.chips.map((item, chipIndex) =>
+                                      chipIndex === index
+                                        ? { ...item, textColor: event.target.value }
+                                        : item,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="color"
+                                value={chip.edgeSpotColor}
+                                disabled={saving}
+                                aria-label={`Chip ${index + 1} edge spot color`}
+                                onChange={(event) =>
+                                  setDraft((current) => ({
+                                    ...current,
+                                    chips: current.chips.map((item, chipIndex) =>
+                                      chipIndex === index
+                                        ? { ...item, edgeSpotColor: event.target.value }
+                                        : item,
+                                    ),
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={chip.edgeSpotQuantity}
+                                disabled={saving}
+                                aria-label={`Chip ${index + 1} edge spot quantity`}
+                                onChange={(event) =>
+                                  setDraft((current) => ({
+                                    ...current,
+                                    chips: current.chips.map((item, chipIndex) =>
+                                      chipIndex === index
+                                        ? {
+                                            ...item,
+                                            edgeSpotQuantity: event.target.value,
+                                          }
                                         : item,
                                     ),
                                   }))
