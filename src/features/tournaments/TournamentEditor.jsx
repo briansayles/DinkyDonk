@@ -6,6 +6,7 @@ import {
   getChipSupportedPlayers,
   getMaxChipSupportedPlayers,
 } from "../../domain/tournament";
+import CurrencyInput from "../../components/CurrencyInput";
 
 export default function TournamentEditor({
   deleteTournament,
@@ -69,16 +70,13 @@ export default function TournamentEditor({
                     />
                     <label className="form-field">
                       Buyin Cost
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <CurrencyInput
                         value={draft.buyinCost}
                         disabled={saving}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setDraft((current) => ({
                             ...current,
-                            buyinCost: event.target.value,
+                            buyinCost: value,
                           }))
                         }
                       />
@@ -115,16 +113,13 @@ export default function TournamentEditor({
                       </label>
                     <label className="form-field">
                       Rebuy Cost
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <CurrencyInput
                         value={draft.rebuyCost}
                         disabled={saving || !draft.rebuysAllowed}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setDraft((current) => ({
                             ...current,
-                            rebuyCost: event.target.value,
+                            rebuyCost: value,
                           }))
                         }
                       />
@@ -177,16 +172,13 @@ export default function TournamentEditor({
                     </label>
                     <label className="form-field">
                       Addon Cost
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
+                      <CurrencyInput
                         value={draft.addonCost}
                         disabled={saving || !draft.addonsAllowed}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setDraft((current) => ({
                             ...current,
-                            addonCost: event.target.value,
+                            addonCost: value,
                           }))
                         }
                       />

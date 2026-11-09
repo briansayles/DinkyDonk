@@ -274,6 +274,11 @@ lightningcss@^1.33.0:
     lightningcss-win32-arm64-msvc "1.33.0"
     lightningcss-win32-x64-msvc "1.33.0"
 
+locale-currency@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/locale-currency/-/locale-currency-1.1.0.tgz#d00e4051f4d818b5a5eadb7fba1caa5b7c007407"
+  integrity sha512-iUGW0j2UiNnf5r4jeBaZgnGkY0Dp8cSnbXni1UsdDpsHEi3Us6kX4GIs8Z7SxI37EgyulbTDO9TQEJU3M6vofQ==
+
 nanoid@^3.3.20:
   version "3.3.20"
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.20.tgz#dfd4444d85aa10111ef66ba85ed72e08ba0855d8"

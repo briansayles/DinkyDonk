@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createEmptyLevel,
   createNextLevel,
-  formatAmount,
+  formatCurrency,
   sortChips,
   sortLevels,
 } from "./domain/tournament";
@@ -10,13 +10,14 @@ import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
 import { useTournaments } from "./features/tournaments/useTournaments";
 import AboutPanel from "./features/about/AboutPanel";
+import CurrencyInput from "./components/CurrencyInput";
 import SettingsPanel from "./features/settings/SettingsPanel";
 import { useTimerSettings } from "./features/settings/useTimerSettings";
 import TournamentEditor from "./features/tournaments/TournamentEditor";
 import TournamentList from "./features/tournaments/TournamentList";
 import "./App.css";
 
-const tabs = ["Timer", "Tournament", "Players", "Settings", "About"];
+const tabs = ["Timer", "Tournament", "Settings", "About"];
 
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
@@ -419,7 +420,7 @@ function App() {
       ? `Remaining Players: ${remainingPlayers.toLocaleString()}`
       : "",
     totalPrizePool > 0
-      ? `Total Prize Pool: ${formatAmount(totalPrizePool)}`
+      ? `Total Prize Pool: ${formatCurrency(totalPrizePool)}`
       : "",
     averageChipstack > 0
       ? `Average Stack: ${averageChipstack.toLocaleString()}`
@@ -605,6 +606,7 @@ function App() {
                 <TimerPanel
                   activeTimerMessage={activeTimerMessage}
                   activeTimerMessageIndex={activeTimerMessageIndex}
+                  timerMessageCount={timerMessages.length}
                   currentLevel={currentLevel}
                   elapsedMs={elapsedMs}
                   hourProgress={hourProgress}
@@ -674,8 +676,8 @@ function App() {
                         <tr>
                           <th scope="col">Type</th>
                           <th scope="col">Count</th>
-                          <th scope="col">Prize Pool</th>
                           <th scope="col">Chips</th>
+                          <th scope="col">Prize Pool</th>
                         </tr>
                       </thead>
                       {!entriesCollapsed && (
@@ -735,57 +737,13 @@ function App() {
                                 }}
                               />
                             </td>
-                            <td>
-                              {formatAmount(entry.contribution)}
-                            </td>
                             <td>{entry.chipsInPlay.toLocaleString()}</td>
+                            <td>{formatCurrency(entry.contribution)}</td>
                           </tr>
                         ))}
                         <tr>
                           <th scope="row">Other</th>
                           <td aria-label="Other entry count" />
-                          <td>
-                            <input
-                              className="timer-other-input"
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={
-                                activeEntryCountDrafts.otherPrizePool ??
-                                activeTournament.otherPrizePool ??
-                                0
-                              }
-                              aria-label="Other prize-pool contribution"
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setEntryCountDrafts((drafts) => ({
-                                  ...drafts,
-                                  [activeTournament.id]: {
-                                    ...drafts[activeTournament.id],
-                                    otherPrizePool: value,
-                                  },
-                                }));
-                                updateTournamentField(
-                                  activeTournament.id,
-                                  "otherPrizePool",
-                                  value,
-                                );
-                              }}
-                              onBlur={() => {
-                                flushTournamentFieldUpdates();
-                                setEntryCountDrafts((drafts) => {
-                                  const nextDrafts = {
-                                    ...drafts[activeTournament.id],
-                                  };
-                                  delete nextDrafts.otherPrizePool;
-                                  return {
-                                    ...drafts,
-                                    [activeTournament.id]: nextDrafts,
-                                  };
-                                });
-                              }}
-                            />
-                          </td>
                           <td>
                             <input
                               className="timer-other-input"
@@ -828,6 +786,46 @@ function App() {
                               }}
                             />
                           </td>
+                          <td>
+                            <CurrencyInput
+                              className="timer-other-input"
+                              min="0"
+                              step="any"
+                              value={
+                                activeEntryCountDrafts.otherPrizePool ??
+                                activeTournament.otherPrizePool ??
+                                0
+                              }
+                              aria-label="Other prize-pool contribution"
+                              onChange={(value) => {
+                                setEntryCountDrafts((drafts) => ({
+                                  ...drafts,
+                                  [activeTournament.id]: {
+                                    ...drafts[activeTournament.id],
+                                    otherPrizePool: value,
+                                  },
+                                }));
+                                updateTournamentField(
+                                  activeTournament.id,
+                                  "otherPrizePool",
+                                  value,
+                                );
+                              }}
+                              onBlur={() => {
+                                flushTournamentFieldUpdates();
+                                setEntryCountDrafts((drafts) => {
+                                  const nextDrafts = {
+                                    ...drafts[activeTournament.id],
+                                  };
+                                  delete nextDrafts.otherPrizePool;
+                                  return {
+                                    ...drafts,
+                                    [activeTournament.id]: nextDrafts,
+                                  };
+                                });
+                              }}
+                            />
+                          </td>
                         </tr>
                       </tbody>
                       )}
@@ -836,8 +834,8 @@ function App() {
                           <th colSpan="2" scope="row">
                             Total
                           </th>
-                          <td>{formatAmount(totalPrizePool)}</td>
                           <td>{totalChipsInPlay.toLocaleString()}</td>
+                          <td>{formatCurrency(totalPrizePool)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -846,6 +844,56 @@ function App() {
                     <div className="timer-entry-heading">
                       <h3>Bustouts</h3>
                       <div className="timer-entry-heading-actions">
+                        <label className="timer-payout-places">
+                          <span>Busted</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={Math.max(
+                              0,
+                              Number(
+                                activeEntryCountDrafts.buyinCount ??
+                                  activeTournament.buyinCount ??
+                                  0,
+                              ) - 1,
+                            )}
+                            step="1"
+                            value={
+                              activeEntryCountDrafts.bustoutCount ??
+                              activeTournament.bustoutCount ??
+                              0
+                            }
+                            aria-label="Bustouts count"
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setEntryCountDrafts((drafts) => ({
+                                ...drafts,
+                                [activeTournament.id]: {
+                                  ...drafts[activeTournament.id],
+                                  bustoutCount: value,
+                                },
+                              }));
+                              updateTournamentField(
+                                activeTournament.id,
+                                "bustoutCount",
+                                value,
+                              );
+                            }}
+                            onBlur={() => {
+                              flushTournamentFieldUpdates();
+                              setEntryCountDrafts((drafts) => {
+                                const nextDrafts = {
+                                  ...drafts[activeTournament.id],
+                                };
+                                delete nextDrafts.bustoutCount;
+                                return {
+                                  ...drafts,
+                                  [activeTournament.id]: nextDrafts,
+                                };
+                              });
+                            }}
+                          />
+                        </label>
                         <button
                           className="timer-entry-reset"
                           type="button"
@@ -895,53 +943,11 @@ function App() {
                       <tfoot>
                         <tr>
                           <th scope="row">
-                            <input
-                              type="number"
-                              min="0"
-                              max={Math.max(
-                                0,
-                                Number(
-                                  activeEntryCountDrafts.buyinCount ??
-                                    activeTournament.buyinCount ??
-                                    0,
-                                ) - 1,
-                              )}
-                              step="1"
-                              value={
-                                activeEntryCountDrafts.bustoutCount ??
+                            {Number(
+                              activeEntryCountDrafts.bustoutCount ??
                                 activeTournament.bustoutCount ??
-                                0
-                              }
-                              aria-label="Bustouts count"
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                setEntryCountDrafts((drafts) => ({
-                                  ...drafts,
-                                  [activeTournament.id]: {
-                                    ...drafts[activeTournament.id],
-                                    bustoutCount: value,
-                                  },
-                                }));
-                                updateTournamentField(
-                                  activeTournament.id,
-                                  "bustoutCount",
-                                  value,
-                                );
-                              }}
-                              onBlur={() => {
-                                flushTournamentFieldUpdates();
-                                setEntryCountDrafts((drafts) => {
-                                  const nextDrafts = {
-                                    ...drafts[activeTournament.id],
-                                  };
-                                  delete nextDrafts.bustoutCount;
-                                  return {
-                                    ...drafts,
-                                    [activeTournament.id]: nextDrafts,
-                                  };
-                                });
-                              }}
-                            />
+                                0,
+                            ).toLocaleString()}
                           </th>
                           <td>{remainingPlayers.toLocaleString()}</td>
                           <td>{averageChipstack.toLocaleString()}</td>
@@ -1034,9 +1040,7 @@ function App() {
                           <tr key={index}>
                             <th scope="row">{index + 1}</th>
                             <td>
-                              <input
-                                type="number"
-                                min="0"
+                              <CurrencyInput
                                 step={payoutIncrement}
                                 value={
                                   payoutDrafts[activeTournament.id]?.[index] ??
@@ -1044,11 +1048,11 @@ function App() {
                                   0
                                 }
                                 aria-label={`Payout for place ${index + 1}`}
-                                onChange={(event) => {
+                                onChange={(value) => {
                                   const nextDrafts = [
                                     ...(payoutDrafts[activeTournament.id] ?? []),
                                   ];
-                                  nextDrafts[index] = event.target.value;
+                                  nextDrafts[index] = value;
                                   setPayoutDrafts((drafts) => ({
                                     ...drafts,
                                     [activeTournament.id]: nextDrafts,
@@ -1056,7 +1060,7 @@ function App() {
                                   updateTournamentField(
                                     activeTournament.id,
                                     "payout",
-                                    event.target.value,
+                                    value,
                                     index,
                                   );
                                 }}
@@ -1092,7 +1096,7 @@ function App() {
                                 ✓
                               </span>
                             )}
-                            {formatAmount(payoutTotal)}
+                            {formatCurrency(payoutTotal)}
                           </td>
                         </tr>
                       </tfoot>

@@ -1,3 +1,5 @@
+import { getCurrency } from "locale-currency";
+
 const curatedBlindValues = [
   1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 250,
   300, 400, 500, 600, 750, 1000,
@@ -88,6 +90,18 @@ export function formatAmount(value) {
   return Number(value).toLocaleString(undefined, {
     maximumFractionDigits: 20,
   });
+}
+
+export function formatCurrency(value) {
+  const locale = Intl.NumberFormat().resolvedOptions().locale;
+  const region = new Intl.Locale(locale).maximize().region;
+  const currency = getCurrency(locale) ?? getCurrency(region) ?? "USD";
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+  }).format(Number(value));
 }
 
 export function formatChipNumber(value) {

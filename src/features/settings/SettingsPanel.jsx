@@ -1,3 +1,15 @@
+function formatSettingsDirectory(directory) {
+  const uncPrefix = "\\\\?\\UNC\\";
+  if (directory.startsWith(uncPrefix)) {
+    return `\\\\${directory.slice(uncPrefix.length)}`;
+  }
+
+  const extendedPrefix = "\\\\?\\";
+  return directory.startsWith(extendedPrefix)
+    ? directory.slice(extendedPrefix.length)
+    : directory;
+}
+
 export default function SettingsPanel({
   changingSettingsDirectory,
   onChangeSettingsDirectory,
@@ -16,11 +28,15 @@ export default function SettingsPanel({
           {timerSettingsError}
         </p>
       )}
-      <div className="settings-directory-controls">
-        <div>
-          <strong>Settings file directory</strong>
+      <section className="settings-section settings-directory-section" aria-labelledby="settings-directory-heading">
+        <h3 id="settings-directory-heading">Settings file directory</h3>
+        <p>Choose where tournament structures and timer preferences are stored.</p>
+        <div className="settings-directory-controls">
+          <div>
           <p className="settings-directory-path">
-            {settingsDirectory || "Loading directory..."}
+            {settingsDirectory
+              ? formatSettingsDirectory(settingsDirectory)
+              : "Loading directory..."}
           </p>
           <p className="settings-directory-help">
             Tournament structures and timer preferences are saved here.
@@ -34,7 +50,51 @@ export default function SettingsPanel({
         >
           {changingSettingsDirectory ? "Changing..." : "Choose folder"}
         </button>
-      </div>
+        </div>
+      </section>
+      <section className="settings-audio-controls" aria-labelledby="settings-audio-heading">
+        <h3 id="settings-audio-heading">Audio settings</h3>
+        <p>Set the playback volume and spoken-announcement speed.</p>
+        <label className="settings-volume-control">
+          <span>Volume</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value={timerSettings.volume}
+            onChange={(event) =>
+              setTimerSettings((current) => ({
+                ...current,
+                volume: Number(event.target.value),
+              }))
+            }
+            aria-label="Timer volume"
+          />
+        </label>
+        <label className="settings-volume-control">
+          <span>Announcement Speed</span>
+          <input
+            type="range"
+            min="0.5"
+            max="2"
+            step="0.05"
+            value={timerSettings.announcementSpeed}
+            disabled={!timerSettings.spokenAnnouncementEnabled}
+            onChange={(event) =>
+              setTimerSettings((current) => ({
+                ...current,
+                announcementSpeed: Number(event.target.value),
+              }))
+            }
+            aria-label="Announcement speed"
+          />
+          <output>{timerSettings.announcementSpeed.toFixed(2)}×</output>
+        </label>
+      </section>
+      <section className="settings-level-change" aria-labelledby="settings-level-change-heading">
+        <h3 id="settings-level-change-heading">Level changes</h3>
+        <p>Choose the alarm and spoken announcement used when a new level begins.</p>
       <label className="form-field">
         Level-change alarm
         <select
@@ -93,48 +153,11 @@ export default function SettingsPanel({
             " and announcement"}{" "}
           (100/200, ante 25)
         </button>
-        <label className="settings-volume-control">
-          <span>Volume</span>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={timerSettings.volume}
-            onChange={(event) =>
-              setTimerSettings((current) => ({
-                ...current,
-                volume: Number(event.target.value),
-              }))
-            }
-            aria-label="Timer volume"
-          />
-        </label>
-        <label className="settings-volume-control">
-          <span>Announcement Speed</span>
-          <input
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            value={timerSettings.announcementSpeed}
-            disabled={!timerSettings.spokenAnnouncementEnabled}
-            onChange={(event) =>
-              setTimerSettings((current) => ({
-                ...current,
-                announcementSpeed: Number(event.target.value),
-              }))
-            }
-            aria-label="Announcement speed"
-          />
-          <output>{timerSettings.announcementSpeed.toFixed(1)}×</output>
-        </label>
       </div>
+      </section>
       <div className="settings-countdown-warning">
         <h3>Level countdown warning</h3>
-        <p>
-          Play once per level when the selected number of seconds remain.
-        </p>
+        <p>Choose an optional alarm and announcement before a level ends.</p>
         <label className="form-field">
           Seconds remaining
           <input

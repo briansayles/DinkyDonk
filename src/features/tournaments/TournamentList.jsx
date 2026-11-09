@@ -1,6 +1,7 @@
 import {
   formatChipNumber,
   formatChipStackTotal,
+  formatCurrency,
   getChipColorUpsByLevel,
   getChipSupportedPlayers,
   getMaxChipSupportedPlayers,
@@ -131,7 +132,9 @@ export default function TournamentList({
                         <div>
                           <dt>Buyin Cost</dt>
                           <dd>
-                            {tournament.buyinCost ?? "Not set"}
+                            {tournament.buyinCost == null
+                              ? "Not set"
+                              : formatCurrency(tournament.buyinCost)}
                             {tournament.buyinDescription && (
                               <span className="tournament-cost-description">
                                 {tournament.buyinDescription}
@@ -142,7 +145,9 @@ export default function TournamentList({
                         <div>
                           <dt>Rebuy Cost</dt>
                           <dd>
-                            {tournament.rebuyCost ?? "Not set"}
+                            {tournament.rebuyCost == null
+                              ? "Not set"
+                              : formatCurrency(tournament.rebuyCost)}
                             {tournament.rebuyDescription && (
                               <span className="tournament-cost-description">
                                 {tournament.rebuyDescription}
@@ -153,7 +158,9 @@ export default function TournamentList({
                         <div>
                           <dt>Addon Cost</dt>
                           <dd>
-                            {tournament.addonCost ?? "Not set"}
+                            {tournament.addonCost == null
+                              ? "Not set"
+                              : formatCurrency(tournament.addonCost)}
                             {tournament.addonDescription && (
                               <span className="tournament-cost-description">
                                 {tournament.addonDescription}

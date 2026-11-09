@@ -225,6 +225,7 @@ export default function TimerPanel({
   startedAt,
   timerChips,
   timerIsFullscreen,
+  timerMessageCount,
   timerSettings,
   totalDurationMs,
 }) {
@@ -254,6 +255,9 @@ export default function TimerPanel({
         </div>
         <div className="timer-current-blinds-qr-slot">
           <img src="/qr-code.png" alt="QR code" />
+          <p className="timer-support-caption">
+            Support this program&apos;s developer
+          </p>
         </div>
       </div>
       {currentLevel && (
@@ -347,7 +351,7 @@ export default function TimerPanel({
             <div className="timer-message" aria-live="polite">
               <span
                 key={activeTimerMessageIndex}
-                className="timer-message-text"
+                className={`timer-message-text${timerMessageCount === 1 ? " timer-message-text-static" : ""}`}
               >
                 {activeTimerMessage}
               </span>

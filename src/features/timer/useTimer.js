@@ -163,7 +163,7 @@ export function useTimer({
         playLevelAlarm(
           currentLevel.level,
           timerSettings.countdownWarningSound,
-          speakCountdownWarning,
+          speakCountdownWarningAfterAlarm,
         );
         armed = false;
       }
@@ -412,10 +412,15 @@ export function useTimer({
     window.speechSynthesis.speak(announcement);
   }
 
+  function speakCountdownWarningAfterAlarm() {
+    window.setTimeout(speakCountdownWarning, 1_000);
+  }
+
   function playLevelAlarm(
     level,
     sound = timerSettings.alarmSound,
-    onComplete = () => speakLevelAnnouncement(level),
+    onComplete = () =>
+      window.setTimeout(() => speakLevelAnnouncement(level), 1_000),
   ) {
     playTimerAlarm(
       audioContextRef.current,
@@ -461,7 +466,7 @@ export function useTimer({
   function previewCountdownWarning() {
     return previewAlarm(
       timerSettings.countdownWarningSound,
-      speakCountdownWarning,
+      speakCountdownWarningAfterAlarm,
       {
         log: "Could not start countdown warning preview.",
         display: "The countdown warning preview could not be played.",
