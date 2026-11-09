@@ -6,6 +6,12 @@
 
 DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
 
+## License
+
+Copyright (C) 2026 Brian Sayles.
+
+DinkyDonk is licensed under the [GNU Affero General Public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
+
 ## Optional support
 
 If you find DinkyDonk useful, you can optionally support its author on [Buy Me a Coffee](https://www.buymeacoffee.com/briansayles):
@@ -50,3 +56,19 @@ yarn tauri build
 ```
 
 See the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for the platform-specific tools needed to build desktop packages.
+
+## Built with
+
+<p align="center">
+  <a href="https://tauri.app/">
+    <img src="public/tauri.svg" alt="Tauri" height="48">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://react.dev/">
+    <img src="src/assets/react.svg" alt="React" height="48">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://vite.dev/">
+    <img src="public/vite.svg" alt="Vite" height="48">
+  </a>
+</p>

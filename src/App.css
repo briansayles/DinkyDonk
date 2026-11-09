@@ -1292,6 +1292,86 @@
   text-align: left;
 }
 
+.about-panel {
+  display: grid;
+  max-width: 58rem;
+  gap: 1.5rem;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.about-panel h3,
+.about-panel p {
+  margin: 0;
+}
+
+.about-panel h3 {
+  margin-bottom: 0.5rem;
+}
+
+.about-intro {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.about-logo {
+  width: min(9rem, 40vw);
+}
+
+.about-support {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.about-support-qr {
+  display: block;
+  width: min(11rem, 45vw);
+  height: auto;
+}
+
+.about-features ul {
+  display: grid;
+  gap: 0.5rem;
+  padding-left: 1.25rem;
+  margin: 0;
+}
+
+.about-development pre {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  background: rgba(127, 127, 127, 0.12);
+}
+
+.about-development p + pre {
+  margin-top: 0.5rem;
+}
+
+.about-development pre + p {
+  margin-top: 0.5rem;
+}
+
+.about-built-with {
+  text-align: center;
+}
+
+.about-technology-logos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+}
+
+.about-technology-logos img {
+  display: block;
+  width: auto;
+  height: 3rem;
+}
+
 .settings-countdown-warning {
   display: grid;
   gap: 0.75rem;

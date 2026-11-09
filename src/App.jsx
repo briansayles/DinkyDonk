@@ -9,13 +9,14 @@ import {
 import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
 import { useTournaments } from "./features/tournaments/useTournaments";
+import AboutPanel from "./features/about/AboutPanel";
 import SettingsPanel from "./features/settings/SettingsPanel";
 import { useTimerSettings } from "./features/settings/useTimerSettings";
 import TournamentEditor from "./features/tournaments/TournamentEditor";
 import TournamentList from "./features/tournaments/TournamentList";
 import "./App.css";
 
-const tabs = ["Timer", "Tournament", "Players", "Settings"];
+const tabs = ["Timer", "Tournament", "Players", "Settings", "About"];
 
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
@@ -534,7 +535,9 @@ function App() {
             {storageError}
           </p>
         )}
-        {activeTab === "Settings" ? (
+        {activeTab === "About" ? (
+          <AboutPanel />
+        ) : activeTab === "Settings" ? (
           <SettingsPanel
             changingSettingsDirectory={changingSettingsDirectory}
             onChangeSettingsDirectory={changeSettingsDirectory}
