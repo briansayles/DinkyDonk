@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { sortChips, sortLevels } from "../../domain/tournament";
 
@@ -21,49 +21,77 @@ export function useTournaments() {
   const [payoutPlaceDrafts, setPayoutPlaceDrafts] = useState({});
   const [payoutDrafts, setPayoutDrafts] = useState({});
   const [tableMaxDrafts, setTableMaxDrafts] = useState({});
+  const savingRef = useRef(false);
+  const loadingRef = useRef(false);
+  const pendingFieldUpdatesRef = useRef(false);
+  const fieldUpdateTimeoutRef = useRef(null);
+  const saveQueueRef = useRef(Promise.resolve());
+  const latestTournamentsRef = useRef(tournaments);
+  const latestActiveTournamentIdRef = useRef(activeTournamentId);
 
   async function loadTournaments() {
     const savedTournaments = await invoke("load_tournaments");
+    if (savingRef.current || pendingFieldUpdatesRef.current) {
+      return;
+    }
+
     const normalizedTournaments = normalizeTournaments(
       savedTournaments.tournaments,
     );
-    setTournaments(normalizedTournaments);
-    setActiveTournamentId(savedTournaments.activeTournamentId);
-    setExpandedTournaments(
-      savedTournaments.activeTournamentId
-        ? { [savedTournaments.activeTournamentId]: true }
-        : {},
+    latestTournamentsRef.current = normalizedTournaments;
+    latestActiveTournamentIdRef.current = savedTournaments.activeTournamentId;
+    setTournaments((current) =>
+      JSON.stringify(current) === JSON.stringify(normalizedTournaments)
+        ? current
+        : normalizedTournaments,
     );
+    setActiveTournamentId((current) =>
+      current === savedTournaments.activeTournamentId
+        ? current
+        : savedTournaments.activeTournamentId,
+    );
+    if (savedTournaments.activeTournamentId) {
+      setExpandedTournaments((current) =>
+        current[savedTournaments.activeTournamentId]
+          ? current
+          : { ...current, [savedTournaments.activeTournamentId]: true },
+      );
+    }
   }
 
   useEffect(() => {
     let active = true;
 
-    invoke("load_tournaments")
-      .then((savedTournaments) => {
+    async function synchronizeTournaments() {
+      if (!active || savingRef.current || loadingRef.current) {
+        return;
+      }
+
+      loadingRef.current = true;
+      try {
+        await loadTournaments();
         if (active) {
-          setTournaments(normalizeTournaments(savedTournaments.tournaments));
-          setActiveTournamentId(savedTournaments.activeTournamentId);
-          setExpandedTournaments(
-            savedTournaments.activeTournamentId
-              ? { [savedTournaments.activeTournamentId]: true }
-              : {},
-          );
           setLoadingTournaments(false);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("Could not load tournament structures.", error);
         if (active) {
           setStorageError(
-            "Tournament structures could not be loaded from this device.",
+            "Tournament structures could not be synchronized from the settings directory.",
           );
           setLoadingTournaments(false);
         }
-      });
+      } finally {
+        loadingRef.current = false;
+      }
+    }
+
+    synchronizeTournaments();
+    const intervalId = window.setInterval(synchronizeTournaments, 1_000);
 
     return () => {
       active = false;
+      window.clearInterval(intervalId);
     };
   }, []);
 
@@ -83,12 +111,15 @@ export function useTournaments() {
     nextTournaments,
     nextActiveTournamentId = activeTournamentId,
   ) {
+    savingRef.current = true;
     setSaving(true);
     try {
       await invoke("save_tournaments", {
         tournaments: nextTournaments,
         activeTournamentId: nextActiveTournamentId,
       });
+      latestTournamentsRef.current = nextTournaments;
+      latestActiveTournamentIdRef.current = nextActiveTournamentId;
       setTournaments(nextTournaments);
       setActiveTournamentId(nextActiveTournamentId);
       if (nextActiveTournamentId) {
@@ -104,12 +135,115 @@ export function useTournaments() {
       setStorageError("Tournament changes could not be saved to this device.");
       return false;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
+  function flushTournamentFieldUpdates() {
+    window.clearTimeout(fieldUpdateTimeoutRef.current);
+    fieldUpdateTimeoutRef.current = null;
+    if (!pendingFieldUpdatesRef.current) {
+      return saveQueueRef.current;
+    }
+
+    pendingFieldUpdatesRef.current = false;
+    const nextTournaments = latestTournamentsRef.current;
+    const nextActiveTournamentId = latestActiveTournamentIdRef.current;
+    savingRef.current = true;
+    saveQueueRef.current = saveQueueRef.current.then(async () => {
+      setSaving(true);
+      try {
+        await invoke("save_tournaments", {
+          tournaments: nextTournaments,
+          activeTournamentId: nextActiveTournamentId,
+        });
+        setStorageError("");
+      } catch (error) {
+        console.error("Could not save tournament field changes.", error);
+        setStorageError("Tournament changes could not be saved to this device.");
+      } finally {
+        savingRef.current = false;
+        setSaving(false);
+      }
+    });
+
+    return saveQueueRef.current;
+  }
+
+  function updateTournamentField(tournamentId, field, value, payoutIndex) {
+    const currentTournament = latestTournamentsRef.current.find(
+      (tournament) => tournament.id === tournamentId,
+    );
+    if (!currentTournament) {
+      return;
+    }
+
+    let updatedFields;
+    if (field === "payout") {
+      const parsedPayout = Number(value);
+      const amount =
+        value.trim() !== "" && Number.isFinite(parsedPayout)
+          ? Math.max(0, parsedPayout)
+          : 0;
+      const payouts = Array.from(
+        { length: currentTournament.payoutPlaces ?? 0 },
+        (_, index) =>
+          index === payoutIndex
+            ? amount
+            : Number(currentTournament.payouts?.[index] ?? 0),
+      );
+      updatedFields = { payouts };
+    } else if (field === "payoutPlaces") {
+      const parsedPlaces = Number(value);
+      const payoutPlaces = Number.isFinite(parsedPlaces)
+        ? Math.min(1_000, Math.max(0, Math.floor(parsedPlaces)))
+        : 0;
+      updatedFields = {
+        payoutPlaces,
+        payouts: Array.from({ length: payoutPlaces }, (_, index) =>
+          Number(currentTournament.payouts?.[index] ?? 0),
+        ),
+      };
+    } else if (
+      field === "buyinCount" ||
+      field === "rebuyCount" ||
+      field === "addonCount" ||
+      field === "bustoutCount" ||
+      field === "maxPlayersPerTable"
+    ) {
+      const parsedValue = Number(value);
+      updatedFields = {
+        [field]: Number.isFinite(parsedValue)
+          ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedValue)))
+          : 0,
+      };
+    } else if (field === "otherPrizePool" || field === "otherChipstack") {
+      const parsedValue = Number(value);
+      updatedFields = {
+        [field]: Number.isFinite(parsedValue) ? Math.max(0, parsedValue) : 0,
+      };
+    } else {
+      return;
+    }
+
+    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
+      tournament.id === tournamentId
+        ? { ...tournament, ...updatedFields }
+        : tournament,
+    );
+    latestTournamentsRef.current = nextTournaments;
+    setTournaments(nextTournaments);
+    pendingFieldUpdatesRef.current = true;
+    window.clearTimeout(fieldUpdateTimeoutRef.current);
+    fieldUpdateTimeoutRef.current = window.setTimeout(
+      flushTournamentFieldUpdates,
+      200,
+    );
+  }
+
   async function updateTournamentTimer(tournamentId, timerState) {
-    const nextTournaments = tournaments.map((tournament) =>
+    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
       tournament.id === tournamentId
         ? { ...tournament, ...timerState }
         : tournament,
@@ -118,7 +252,10 @@ export function useTournaments() {
       return false;
     }
 
-    return persistTournamentData(nextTournaments);
+    return persistTournamentData(
+      nextTournaments,
+      latestActiveTournamentIdRef.current,
+    );
   }
 
   async function saveTournament(tournament, editingId) {
@@ -376,6 +513,8 @@ export function useTournaments() {
     updateOtherValue,
     updatePayout,
     updatePayoutPlaces,
+    flushTournamentFieldUpdates,
+    updateTournamentField,
     updateTournamentTimer,
   };
 }

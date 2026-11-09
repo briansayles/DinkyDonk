@@ -52,11 +52,8 @@ function App() {
     storageError,
     tableMaxDrafts,
     tournaments,
-    updateEntryCount,
-    updateMaxPlayersPerTable,
-    updateOtherValue,
-    updatePayout,
-    updatePayoutPlaces,
+    flushTournamentFieldUpdates,
+    updateTournamentField,
     updateTournamentTimer,
   } = tournamentState;
   const {
@@ -702,7 +699,6 @@ function App() {
                                 min="0"
                                 step="1"
                                 value={entry.count}
-                                disabled={saving}
                                 aria-label={`${entry.label} count`}
                                 onChange={(event) => {
                                   const value = event.target.value;
@@ -713,14 +709,25 @@ function App() {
                                       [entry.countField]: value,
                                     },
                                   }));
-                                }}
-                                onBlur={(event) =>
-                                  updateEntryCount(
+                                  updateTournamentField(
                                     activeTournament.id,
                                     entry.countField,
-                                    event.target.value,
-                                  )
-                                }
+                                    value,
+                                  );
+                                }}
+                                onBlur={() => {
+                                  flushTournamentFieldUpdates();
+                                  setEntryCountDrafts((drafts) => {
+                                    const nextDrafts = {
+                                      ...drafts[activeTournament.id],
+                                    };
+                                    delete nextDrafts[entry.countField];
+                                    return {
+                                      ...drafts,
+                                      [activeTournament.id]: nextDrafts,
+                                    };
+                                  });
+                                }}
                               />
                             </td>
                             <td>
@@ -743,7 +750,6 @@ function App() {
                                 activeTournament.otherPrizePool ??
                                 0
                               }
-                              disabled={saving}
                               aria-label="Other prize-pool contribution"
                               onChange={(event) => {
                                 const value = event.target.value;
@@ -754,14 +760,25 @@ function App() {
                                     otherPrizePool: value,
                                   },
                                 }));
-                              }}
-                              onBlur={(event) =>
-                                updateOtherValue(
+                                updateTournamentField(
                                   activeTournament.id,
                                   "otherPrizePool",
-                                  event.target.value,
-                                )
-                              }
+                                  value,
+                                );
+                              }}
+                              onBlur={() => {
+                                flushTournamentFieldUpdates();
+                                setEntryCountDrafts((drafts) => {
+                                  const nextDrafts = {
+                                    ...drafts[activeTournament.id],
+                                  };
+                                  delete nextDrafts.otherPrizePool;
+                                  return {
+                                    ...drafts,
+                                    [activeTournament.id]: nextDrafts,
+                                  };
+                                });
+                              }}
                             />
                           </td>
                           <td>
@@ -775,7 +792,6 @@ function App() {
                                 activeTournament.otherChipstack ??
                                 0
                               }
-                              disabled={saving}
                               aria-label="Other chips-in-play contribution"
                               onChange={(event) => {
                                 const value = event.target.value;
@@ -786,14 +802,25 @@ function App() {
                                     otherChipstack: value,
                                   },
                                 }));
-                              }}
-                              onBlur={(event) =>
-                                updateOtherValue(
+                                updateTournamentField(
                                   activeTournament.id,
                                   "otherChipstack",
-                                  event.target.value,
-                                )
-                              }
+                                  value,
+                                );
+                              }}
+                              onBlur={() => {
+                                flushTournamentFieldUpdates();
+                                setEntryCountDrafts((drafts) => {
+                                  const nextDrafts = {
+                                    ...drafts[activeTournament.id],
+                                  };
+                                  delete nextDrafts.otherChipstack;
+                                  return {
+                                    ...drafts,
+                                    [activeTournament.id]: nextDrafts,
+                                  };
+                                });
+                              }}
                             />
                           </td>
                         </tr>
@@ -880,7 +907,6 @@ function App() {
                                 activeTournament.bustoutCount ??
                                 0
                               }
-                              disabled={saving}
                               aria-label="Bustouts count"
                               onChange={(event) => {
                                 const value = event.target.value;
@@ -891,14 +917,25 @@ function App() {
                                     bustoutCount: value,
                                   },
                                 }));
-                              }}
-                              onBlur={(event) =>
-                                updateEntryCount(
+                                updateTournamentField(
                                   activeTournament.id,
                                   "bustoutCount",
-                                  event.target.value,
-                                )
-                              }
+                                  value,
+                                );
+                              }}
+                              onBlur={() => {
+                                flushTournamentFieldUpdates();
+                                setEntryCountDrafts((drafts) => {
+                                  const nextDrafts = {
+                                    ...drafts[activeTournament.id],
+                                  };
+                                  delete nextDrafts.bustoutCount;
+                                  return {
+                                    ...drafts,
+                                    [activeTournament.id]: nextDrafts,
+                                  };
+                                });
+                              }}
                             />
                           </th>
                           <td>{remainingPlayers.toLocaleString()}</td>
@@ -923,20 +960,26 @@ function App() {
                               activeTournament.payoutPlaces ??
                               0
                             }
-                            disabled={saving}
                             aria-label="Number of players paid"
-                            onChange={(event) =>
+                            onChange={(event) => {
                               setPayoutPlaceDrafts((drafts) => ({
                                 ...drafts,
                                 [activeTournament.id]: event.target.value,
-                              }))
-                            }
-                            onBlur={(event) =>
-                              updatePayoutPlaces(
+                              }));
+                              updateTournamentField(
                                 activeTournament.id,
+                                "payoutPlaces",
                                 event.target.value,
-                              )
-                            }
+                              );
+                            }}
+                            onBlur={() => {
+                              flushTournamentFieldUpdates();
+                              setPayoutPlaceDrafts((drafts) => {
+                                const nextDrafts = { ...drafts };
+                                delete nextDrafts[activeTournament.id];
+                                return nextDrafts;
+                              });
+                            }}
                           />
                         </label>
                         <button
@@ -995,7 +1038,6 @@ function App() {
                                   activeTournament.payouts?.[index] ??
                                   0
                                 }
-                                disabled={saving}
                                 aria-label={`Payout for place ${index + 1}`}
                                 onChange={(event) => {
                                   const nextDrafts = [
@@ -1006,14 +1048,26 @@ function App() {
                                     ...drafts,
                                     [activeTournament.id]: nextDrafts,
                                   }));
-                                }}
-                                onBlur={(event) =>
-                                  updatePayout(
+                                  updateTournamentField(
                                     activeTournament.id,
-                                    index,
+                                    "payout",
                                     event.target.value,
-                                  )
-                                }
+                                    index,
+                                  );
+                                }}
+                                onBlur={() => {
+                                  flushTournamentFieldUpdates();
+                                  setPayoutDrafts((drafts) => {
+                                    const nextPayoutDrafts = [
+                                      ...(drafts[activeTournament.id] ?? []),
+                                    ];
+                                    delete nextPayoutDrafts[index];
+                                    return {
+                                      ...drafts,
+                                      [activeTournament.id]: nextPayoutDrafts,
+                                    };
+                                  });
+                                }}
                               />
                             </td>
                           </tr>
@@ -1054,20 +1108,26 @@ function App() {
                               activeTournament.maxPlayersPerTable ??
                               0
                             }
-                            disabled={saving}
                             aria-label="Maximum players per table"
-                            onChange={(event) =>
+                            onChange={(event) => {
                               setTableMaxDrafts((drafts) => ({
                                 ...drafts,
                                 [activeTournament.id]: event.target.value,
-                              }))
-                            }
-                            onBlur={(event) =>
-                              updateMaxPlayersPerTable(
+                              }));
+                              updateTournamentField(
                                 activeTournament.id,
+                                "maxPlayersPerTable",
                                 event.target.value,
-                              )
-                            }
+                              );
+                            }}
+                            onBlur={() => {
+                              flushTournamentFieldUpdates();
+                              setTableMaxDrafts((drafts) => {
+                                const nextDrafts = { ...drafts };
+                                delete nextDrafts[activeTournament.id];
+                                return nextDrafts;
+                              });
+                            }}
                           />
                         </label>
                         <button
