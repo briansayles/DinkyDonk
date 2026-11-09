@@ -13,10 +13,9 @@ export function useTimer({
   timerMessages,
   timerSettings,
   setTimerSettingsError,
+  updateTournamentTimer,
 }) {
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [startedAt, setStartedAt] = useState(null);
-  const [clockNowMs, setClockNowMs] = useState(0);
+  const [clockNowMs, setClockNowMs] = useState(Date.now);
   const [timerMessageIndex, setTimerMessageIndex] = useState(0);
   const [timerChips, setTimerChips] = useState([]);
   const [timerFullscreenError, setTimerFullscreenError] = useState("");
@@ -28,6 +27,13 @@ export function useTimer({
   const audioContextRef = useRef(null);
   const previousLevelRef = useRef(null);
   const previousWarningLevelRef = useRef(null);
+  const completedTimerTournamentRef = useRef(null);
+
+  const elapsedMs = activeTournament?.timerElapsedMs ?? 0;
+  const timerIsRunning = activeTournament?.timerIsRunning ?? false;
+  const startedAt = timerIsRunning
+    ? (activeTournament?.timerStartedAt ?? null)
+    : null;
 
   const activeTournamentKey = activeTournament
     ? JSON.stringify({
@@ -41,6 +47,9 @@ export function useTimer({
         payoutPlaces: undefined,
         payouts: undefined,
         maxPlayersPerTable: undefined,
+        timerIsRunning: undefined,
+        timerStartedAt: undefined,
+        timerElapsedMs: undefined,
       })
     : "";
   const totalDurationMs =
@@ -113,9 +122,7 @@ export function useTimer({
   }, [activeTournament, currentLevel?.index]);
 
   useEffect(() => {
-    setElapsedMs(0);
-    setStartedAt(null);
-    setClockNowMs(0);
+    setClockNowMs(Date.now());
   }, [activeTournament?.id]);
 
   useEffect(() => {
@@ -226,10 +233,22 @@ export function useTimer({
       totalDurationMs > 0 &&
       currentElapsedMs >= totalDurationMs
     ) {
-      setElapsedMs(totalDurationMs);
-      setStartedAt(null);
+      if (completedTimerTournamentRef.current !== activeTournament?.id) {
+        completedTimerTournamentRef.current = activeTournament?.id ?? null;
+        updateTournamentTimer(activeTournament.id, {
+          timerElapsedMs: totalDurationMs,
+          timerStartedAt: null,
+          timerIsRunning: false,
+        });
+      }
     }
-  }, [currentElapsedMs, startedAt, totalDurationMs]);
+  }, [
+    activeTournament?.id,
+    currentElapsedMs,
+    startedAt,
+    totalDurationMs,
+    updateTournamentTimer,
+  ]);
 
   useEffect(() => {
     function updateFullscreenState() {
@@ -502,26 +521,52 @@ export function useTimer({
     }
 
     const now = Date.now();
-    if (startedAt !== null) {
-      setElapsedMs(Math.min(totalDurationMs, elapsedMs + now - startedAt));
-      setStartedAt(null);
+    if (timerIsRunning) {
+      const elapsedSinceStart =
+        activeTournament.timerStartedAt === null ||
+        activeTournament.timerStartedAt === undefined
+          ? 0
+          : now - activeTournament.timerStartedAt;
+      updateTournamentTimer(activeTournament.id, {
+        timerElapsedMs: Math.min(
+          totalDurationMs,
+          elapsedMs + elapsedSinceStart,
+        ),
+        timerStartedAt: null,
+        timerIsRunning: false,
+      });
     } else if (elapsedMs < totalDurationMs) {
       prepareTimerAudio();
-      setStartedAt(now);
+      completedTimerTournamentRef.current = null;
+      updateTournamentTimer(activeTournament.id, {
+        timerElapsedMs: elapsedMs,
+        timerStartedAt: now,
+        timerIsRunning: true,
+      });
     }
     setClockNowMs(now);
   }
 
   function resetTimer() {
-    setElapsedMs(0);
-    setStartedAt(null);
+    completedTimerTournamentRef.current = null;
+    if (activeTournament) {
+      updateTournamentTimer(activeTournament.id, {
+        timerElapsedMs: 0,
+        timerStartedAt: null,
+        timerIsRunning: false,
+      });
+    }
     setClockNowMs(Date.now());
   }
 
   function setTimerPosition(positionMs, now) {
-    setElapsedMs(positionMs);
-    if (startedAt !== null) {
-      setStartedAt(now);
+    completedTimerTournamentRef.current = null;
+    if (activeTournament) {
+      updateTournamentTimer(activeTournament.id, {
+        timerElapsedMs: positionMs,
+        timerStartedAt: timerIsRunning ? now : null,
+        timerIsRunning,
+      });
     }
     setClockNowMs(now);
   }

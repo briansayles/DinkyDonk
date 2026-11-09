@@ -141,6 +141,12 @@ struct Tournament {
     #[serde(default)]
     chips: Vec<TournamentChip>,
     levels: Vec<TournamentLevel>,
+    #[serde(default)]
+    timer_is_running: bool,
+    #[serde(default)]
+    timer_started_at: Option<f64>,
+    #[serde(default)]
+    timer_elapsed_ms: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -355,12 +361,6 @@ fn save_tournaments(
         .map_err(|error| format!("Could not save tournament structures: {error}"))
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let (keep_awake_sender, keep_awake_receiver) = mpsc::channel::<KeepAwakeRequest>();
@@ -385,7 +385,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
             set_keep_awake,
             get_settings_directory,
             set_settings_directory,

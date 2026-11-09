@@ -57,6 +57,7 @@ function App() {
     updateOtherValue,
     updatePayout,
     updatePayoutPlaces,
+    updateTournamentTimer,
   } = tournamentState;
   const {
     changingSettingsDirectory,
@@ -210,6 +211,9 @@ function App() {
       payoutPlaces: existingTournament?.payoutPlaces ?? 0,
       payouts: existingTournament?.payouts ?? [],
       maxPlayersPerTable: existingTournament?.maxPlayersPerTable ?? 0,
+      timerIsRunning: existingTournament?.timerIsRunning ?? false,
+      timerStartedAt: existingTournament?.timerStartedAt ?? null,
+      timerElapsedMs: existingTournament?.timerElapsedMs ?? 0,
       chips: sortChips(
         draft.chips.map((chip) => ({
           color: chip.color,
@@ -429,6 +433,7 @@ function App() {
     timerMessages,
     timerSettings,
     setTimerSettingsError,
+    updateTournamentTimer,
   });
   const {
     activeTimerMessage,
@@ -498,14 +503,14 @@ function App() {
             aria-selected={activeTab === tab}
             onClick={() => {
               setActiveTab(tab);
-              if (tab === "Timer") {
-                window.requestAnimationFrame(() => {
-                  timerPanelRef.current?.scrollIntoView({
-                    behavior: "smooth",
-                    block: "start",
-                  });
-                });
-              }
+              // if (tab === "Timer") {
+              //   window.requestAnimationFrame(() => {
+              //     timerPanelRef.current?.scrollIntoView({
+              //       behavior: "smooth",
+              //       block: "start",
+              //     });
+              //   });
+              // }
             }}
           >
             {tab}

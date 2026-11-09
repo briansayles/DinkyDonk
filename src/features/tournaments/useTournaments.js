@@ -108,6 +108,19 @@ export function useTournaments() {
     }
   }
 
+  async function updateTournamentTimer(tournamentId, timerState) {
+    const nextTournaments = tournaments.map((tournament) =>
+      tournament.id === tournamentId
+        ? { ...tournament, ...timerState }
+        : tournament,
+    );
+    if (!nextTournaments.some((tournament) => tournament.id === tournamentId)) {
+      return false;
+    }
+
+    return persistTournamentData(nextTournaments);
+  }
+
   async function saveTournament(tournament, editingId) {
     const nextTournaments = editingId
       ? tournaments.map((item) => (item.id === editingId ? tournament : item))
@@ -363,5 +376,6 @@ export function useTournaments() {
     updateOtherValue,
     updatePayout,
     updatePayoutPlaces,
+    updateTournamentTimer,
   };
 }
