@@ -8,6 +8,7 @@ import {
 
 export default function TournamentList({
   activeTournamentId,
+  copyTournament,
   draft,
   editTournament,
   expandedTournaments,
@@ -60,6 +61,13 @@ export default function TournamentList({
                           onClick={() => editTournament(tournament)}
                         >
                           Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => copyTournament(tournament.id)}
+                        >
+                          Copy
                         </button>
                         <button
                           className="tournament-card-toggle"

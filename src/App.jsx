@@ -30,6 +30,7 @@ function App() {
   const {
     activeTournament,
     activeTournamentId,
+    copyTournament,
     deleteTournament: removeTournament,
     entryCountDrafts,
     expandedTournaments,
@@ -581,6 +582,7 @@ function App() {
 
             <TournamentList
               activeTournamentId={activeTournamentId}
+              copyTournament={copyTournament}
               draft={draft}
               editTournament={editTournament}
               expandedTournaments={expandedTournaments}

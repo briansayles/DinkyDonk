@@ -266,6 +266,58 @@ export function useTournaments() {
     return persistTournamentData(nextTournaments);
   }
 
+  async function copyTournament(tournamentId) {
+    await flushTournamentFieldUpdates();
+    const source = latestTournamentsRef.current.find(
+      (tournament) => tournament.id === tournamentId,
+    );
+    if (!source) {
+      return false;
+    }
+
+    const copy = {
+      id: crypto.randomUUID(),
+      name: `Copy of ${source.name}`,
+      startingChipstack: source.startingChipstack ?? null,
+      rebuysAllowed: source.rebuysAllowed ?? false,
+      addonsAllowed: source.addonsAllowed ?? false,
+      buyinCost: source.buyinCost ?? null,
+      buyinDescription: source.buyinDescription ?? null,
+      rebuyCost: source.rebuyCost ?? null,
+      rebuyChipstack: source.rebuyChipstack ?? null,
+      rebuyDescription: source.rebuyDescription ?? null,
+      addonCost: source.addonCost ?? null,
+      addonChipstack: source.addonChipstack ?? null,
+      addonDescription: source.addonDescription ?? null,
+      buyinCount: 0,
+      rebuyCount: 0,
+      addonCount: 0,
+      otherPrizePool: 0,
+      otherChipstack: 0,
+      bustoutCount: 0,
+      payoutPlaces: 0,
+      payouts: [],
+      maxPlayersPerTable: source.maxPlayersPerTable ?? 0,
+      timerIsRunning: false,
+      timerStartedAt: null,
+      timerElapsedMs: 0,
+      chips: (source.chips ?? []).map((chip) => ({ ...chip })),
+      levels: source.levels.map((level) => ({ ...level })),
+    };
+    const nextTournaments = [...latestTournamentsRef.current, copy];
+    if (
+      !(await persistTournamentData(
+        nextTournaments,
+        latestActiveTournamentIdRef.current,
+      ))
+    ) {
+      return false;
+    }
+
+    setExpandedTournaments((current) => ({ ...current, [copy.id]: true }));
+    return true;
+  }
+
   async function deleteTournament(id) {
     const nextTournaments = tournaments.filter((item) => item.id !== id);
     const nextActiveTournamentId =
@@ -484,6 +536,7 @@ export function useTournaments() {
       (tournament) => tournament.id === activeTournamentId,
     ),
     activeTournamentId,
+    copyTournament,
     deleteTournament,
     entryCountDrafts,
     expandedTournaments,

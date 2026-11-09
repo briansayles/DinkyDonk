@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-labelledby="title">
+  <title id="title">DinkyDonk poker timer logo</title>
+  <rect x="14" y="14" width="292" height="292" rx="72" fill="#123b25"/>
+  <circle cx="160" cy="135" r="87" fill="#f7f1df"/>
+  <circle cx="160" cy="135" r="73" fill="none" stroke="#d7a928" stroke-width="8" stroke-dasharray="4 12" stroke-linecap="round"/>
+  <circle cx="160" cy="135" r="56" fill="#123b25"/>
+  <path d="M160 97v42l29 18" fill="none" stroke="#f7f1df" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="160" cy="135" r="7" fill="#d7a928"/>
+  <path d="M160 63l12 16-12 16-12-16z" fill="#d7a928"/>
+  <text x="160" y="257" fill="#f7f1df" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" letter-spacing="-1.4" text-anchor="middle">DinkyDonk</text>
+</svg>

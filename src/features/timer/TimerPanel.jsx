@@ -231,6 +231,9 @@ export default function TimerPanel({
   return (
     <div className="timer-display">
       <div className="timer-current-blinds-row">
+        <div className="timer-current-blinds-logo-slot">
+          <img src="/dinkydonk-logo.svg" alt="DinkyDonk" />
+        </div>
         <div
           className="timer-blinds-group"
           title="Double-click to edit the blinds schedule"
@@ -249,27 +252,30 @@ export default function TimerPanel({
           </p>
           <p className="timer-blinds-label">Current Blinds</p>
         </div>
-        {currentLevel && (
-          <div
-            className="timer-next-blinds-group"
-            title="Double-click to edit the blinds schedule"
-            onDoubleClick={() => onEditSection("edit-entry-levels")}
-          >
-            <p className="timer-next-blinds">
-              {!nextLevel
-                ? "Last Level"
-                : nextLevel.level.isBreak
-                  ? "BREAK"
-                  : formatBlinds(
-                      nextLevel.level.smallBlind,
-                      nextLevel.level.bigBlind,
-                      nextLevel.level.ante,
-                    )}
-            </p>
-            <p className="timer-next-blinds-label">Next Blinds</p>
-          </div>
-        )}
+        <div className="timer-current-blinds-qr-slot">
+          <img src="/qr-code.png" alt="QR code" />
+        </div>
       </div>
+      {currentLevel && (
+        <div
+          className="timer-next-blinds-group"
+          title="Double-click to edit the blinds schedule"
+          onDoubleClick={() => onEditSection("edit-entry-levels")}
+        >
+          <p className="timer-next-blinds">
+            {!nextLevel
+              ? "Last Level"
+              : nextLevel.level.isBreak
+                ? "BREAK"
+                : formatBlinds(
+                    nextLevel.level.smallBlind,
+                    nextLevel.level.bigBlind,
+                    nextLevel.level.ante,
+                  )}
+          </p>
+          <p className="timer-next-blinds-label">Next Blinds</p>
+        </div>
+      )}
       <div className="timer-left-chips" aria-label="Chips in use">
         {timerChips.map((chip) => (
           <TimerChip
