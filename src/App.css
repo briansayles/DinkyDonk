@@ -1338,10 +1338,6 @@
   text-align: right;
 }
 
-.tournament-chip-editor-table td .chip-supported-value {
-  padding-right: 0.65rem;
-}
-
 .tournament-chip-editor-table td input:not([type="color"]),
 .tournament-level-editor-table td input {
   width: 100%;
@@ -1375,7 +1371,7 @@
   align-items: center;
   min-height: 2.75rem;
   width: 100%;
-  padding: 0.6em 1.2em;
+  padding: 0.5rem 0.75rem;
   overflow: hidden;
   border: 1px solid rgba(127, 127, 127, 0.45);
   border-radius: 8px;
@@ -1412,6 +1408,26 @@
   display: grid;
   gap: 1rem;
   text-align: left;
+}
+
+.settings-panel button {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+}
+
+.settings-panel input,
+.settings-panel select,
+.settings-panel textarea {
+  max-width: 50vw;
+}
+
+.settings-panel .settings-countdown-warning-seconds {
+  width: 6.25%;
+}
+
+.settings-panel .settings-sound-select {
+  width: 25%;
 }
 
 .about-panel {
@@ -1588,9 +1604,10 @@
 
 .settings-switch {
   display: inline-flex;
+  width: fit-content;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
   cursor: pointer;
 }
 

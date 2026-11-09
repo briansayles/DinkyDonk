@@ -219,7 +219,7 @@ function App() {
           color: chip.color,
           edgeSpotColor: chip.edgeSpotColor ?? "#000000",
           textColor: chip.textColor ?? "#ffffff",
-          edgeSpotQuantity: chip.edgeSpotQuantity === "" ? null : Number(chip.edgeSpotQuantity),
+          edgeSpotQuantity: chip.edgeSpotQuantity > 0 ? Number(chip.edgeSpotQuantity) : null,
           denomination: Number(chip.denomination),
           availableQuantity:
             chip.availableQuantity === ""
@@ -503,14 +503,9 @@ function App() {
             aria-selected={activeTab === tab}
             onClick={() => {
               setActiveTab(tab);
-              // if (tab === "Timer") {
-              //   window.requestAnimationFrame(() => {
-              //     timerPanelRef.current?.scrollIntoView({
-              //       behavior: "smooth",
-              //       block: "start",
-              //     });
-              //   });
-              // }
+              if (tab === "Timer") {
+                timer.enterTimerFullscreen();
+              }
             }}
           >
             {tab}

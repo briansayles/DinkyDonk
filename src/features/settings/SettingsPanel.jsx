@@ -31,18 +31,6 @@ export default function SettingsPanel({
       <section className="settings-section settings-directory-section" aria-labelledby="settings-directory-heading">
         <h3 id="settings-directory-heading">Settings file directory</h3>
         <p>Choose where tournament structures and timer preferences are stored.</p>
-        <div className="settings-directory-controls">
-          <div>
-          <p className="settings-directory-path">
-            {settingsDirectory
-              ? formatSettingsDirectory(settingsDirectory)
-              : "Loading directory..."}
-          </p>
-          <p className="settings-directory-help">
-            Tournament structures and timer preferences are saved here.
-            Existing files in the selected directory are kept.
-          </p>
-        </div>
         <button
           type="button"
           onClick={onChangeSettingsDirectory}
@@ -50,6 +38,14 @@ export default function SettingsPanel({
         >
           {changingSettingsDirectory ? "Changing..." : "Choose folder"}
         </button>
+        <div className="settings-directory-controls">
+          <div>
+            <p className="settings-directory-path">
+              {settingsDirectory
+                ? formatSettingsDirectory(settingsDirectory)
+                : "Loading directory..."}
+            </p>
+          </div>
         </div>
       </section>
       <section className="settings-audio-controls" aria-labelledby="settings-audio-heading">
@@ -80,7 +76,6 @@ export default function SettingsPanel({
             max="2"
             step="0.05"
             value={timerSettings.announcementSpeed}
-            disabled={!timerSettings.spokenAnnouncementEnabled}
             onChange={(event) =>
               setTimerSettings((current) => ({
                 ...current,
@@ -98,6 +93,7 @@ export default function SettingsPanel({
       <label className="form-field">
         Level-change alarm
         <select
+          className="settings-sound-select"
           value={timerSettings.alarmSound}
           onChange={(event) =>
             setTimerSettings((current) => ({
@@ -137,6 +133,7 @@ export default function SettingsPanel({
         <textarea
           rows="5"
           value={timerSettings.announcement}
+          disabled={!(timerSettings.spokenAnnouncementEnabled)}
           title="Use {smallBlind}, {bigBlind}, or {ante} to insert level values. Use {antePhrase} to include “with an ante of [ante]” only when the ante is greater than zero."
           onChange={(event) =>
             setTimerSettings((current) => ({
@@ -161,6 +158,7 @@ export default function SettingsPanel({
         <label className="form-field">
           Seconds remaining
           <input
+            className="settings-countdown-warning-seconds"
             type="number"
             min="1"
             max="3600"
@@ -180,6 +178,7 @@ export default function SettingsPanel({
         <label className="form-field">
           Warning alarm
           <select
+            className="settings-sound-select"
             value={timerSettings.countdownWarningSound}
             onChange={(event) =>
               setTimerSettings((current) => ({

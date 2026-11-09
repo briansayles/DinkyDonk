@@ -450,7 +450,7 @@ export default function TournamentEditor({
                       </tbody>
                       <tfoot>
                         <tr>
-                          <th colSpan="4" scope="row">Totals</th>
+                          <th colSpan="7" scope="row">Totals</th>
                           <td className="numeric-column">
                             <output className="chip-stack-value chip-stack-total">
                               {draft.startingChipstack !== "" &&
@@ -473,11 +473,13 @@ export default function TournamentEditor({
                             </output>
                           </td>
                           <td className="numeric-column">
-                            {getMaxChipSupportedPlayers(draft.chips) == null
-                              ? "∞"
-                              : formatChipNumber(
-                                  getMaxChipSupportedPlayers(draft.chips),
-                                )}
+                            <output className="chip-stack-value chip-supported-value">
+                              {getMaxChipSupportedPlayers(draft.chips) == null
+                                ? "∞"
+                                : formatChipNumber(
+                                    getMaxChipSupportedPlayers(draft.chips),
+                                  )}
+                            </output>
                           </td>
                           <td />
                         </tr>

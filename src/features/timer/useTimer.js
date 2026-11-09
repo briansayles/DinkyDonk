@@ -520,6 +520,24 @@ export function useTimer({
     }
   }
 
+  async function enterTimerFullscreen() {
+    if (document.fullscreenElement === timerPanelRef.current) {
+      return;
+    }
+
+    try {
+      setTimerFullscreenError("");
+      if (!timerPanelRef.current?.requestFullscreen) {
+        setTimerFullscreenError("Fullscreen mode is not available.");
+        return;
+      }
+      await timerPanelRef.current.requestFullscreen();
+    } catch (error) {
+      console.error("Could not enter timer fullscreen.", error);
+      setTimerFullscreenError("Could not enter fullscreen mode.");
+    }
+  }
+
   function toggleTimer() {
     if (!activeTournament || totalDurationMs <= 0) {
       return;
@@ -647,6 +665,7 @@ export function useTimer({
     activeTimerMessage: timerMessages[activeTimerMessageIndex],
     currentLevel,
     elapsedMs,
+    enterTimerFullscreen,
     finishTimerChipAnimation,
     hourProgress,
     jumpToNextLevel,

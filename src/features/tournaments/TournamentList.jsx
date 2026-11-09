@@ -31,11 +31,34 @@ export default function TournamentList({
                       tournament.chips ?? [],
                       tournament.levels,
                     );
+                    const hasExpansionPreference =
+                      Object.prototype.hasOwnProperty.call(
+                        expandedTournaments,
+                        tournament.id,
+                      );
+                    const isExpanded =
+                      hasExpansionPreference &&
+                      expandedTournaments[tournament.id] === true;
 
                     return (
                     <li className="tournament-card" key={tournament.id}>
                       <div className="tournament-card-heading">
                         <h3>{tournament.name}</h3>
+                        <div className="tournament-card-heading-spacer" />
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => editTournament(tournament)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => copyTournament(tournament.id)}
+                        >
+                          Copy
+                        </button>
                         <button
                           className={
                             activeTournamentId === tournament.id
@@ -55,57 +78,31 @@ export default function TournamentList({
                             ? "Active structure"
                             : "Set as active"}
                         </button>
-                        <div className="tournament-card-heading-spacer" />
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => editTournament(tournament)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => copyTournament(tournament.id)}
-                        >
-                          Copy
-                        </button>
                         <button
                           className="tournament-card-toggle"
                           type="button"
-                          aria-label={`${
-                            (expandedTournaments[tournament.id] ??
-                              activeTournamentId === tournament.id)
-                              ? "Collapse"
-                              : "Expand"
-                          } ${tournament.name}`}
-                          aria-expanded={
-                            expandedTournaments[tournament.id] ??
-                            activeTournamentId === tournament.id
-                          }
+                          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${tournament.name}`}
+                          aria-expanded={isExpanded}
                           onClick={() =>
-                            setExpandedTournaments((current) => ({
-                              ...current,
-                              [tournament.id]: !(
-                                current[tournament.id] ??
-                                activeTournamentId === tournament.id
-                              ),
-                            }))
+                            setExpandedTournaments((current) => {
+                              const currentlyExpanded =
+                                current[tournament.id] === true;
+                              return {
+                                ...current,
+                                [tournament.id]: !currentlyExpanded,
+                              };
+                            })
                           }
                         >
                           <span
                             className={`tournament-card-chevron${
-                              (expandedTournaments[tournament.id] ??
-                                activeTournamentId === tournament.id)
-                                ? " expanded"
-                                : ""
+                              isExpanded ? " expanded" : ""
                             }`}
                             aria-hidden="true"
                           />
                         </button>
                       </div>
-                      {(expandedTournaments[tournament.id] ??
-                        activeTournamentId === tournament.id) && (
+                      {isExpanded && (
                         <div className="tournament-card-content">
                       <h4 className="tournament-card-section-title">Costs</h4>
                       <dl className="tournament-details">

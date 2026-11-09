@@ -52,7 +52,10 @@ export function useTournaments() {
     );
     if (savedTournaments.activeTournamentId) {
       setExpandedTournaments((current) =>
-        current[savedTournaments.activeTournamentId]
+        Object.prototype.hasOwnProperty.call(
+          current,
+          savedTournaments.activeTournamentId,
+        )
           ? current
           : { ...current, [savedTournaments.activeTournamentId]: true },
       );
@@ -122,12 +125,6 @@ export function useTournaments() {
       latestActiveTournamentIdRef.current = nextActiveTournamentId;
       setTournaments(nextTournaments);
       setActiveTournamentId(nextActiveTournamentId);
-      if (nextActiveTournamentId) {
-        setExpandedTournaments((current) => ({
-          ...current,
-          [nextActiveTournamentId]: true,
-        }));
-      }
       setStorageError("");
       return true;
     } catch (error) {
