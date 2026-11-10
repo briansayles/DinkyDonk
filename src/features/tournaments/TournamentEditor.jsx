@@ -5,6 +5,13 @@ import {
   getChipStackSummary,
   getChipSupportedPlayers,
   getMaxChipSupportedPlayers,
+  DEFAULT_EDGE_SPOT_QUANTITY,
+  DEFAULT_ALLOW_PAYOUT_OVERRIDE,
+  DEFAULT_PAYOUT_MODEL,
+  DEFAULT_PERCENT_PAID,
+  MAX_EDGE_SPOT_QUANTITY,
+  MIN_EDGE_SPOT_QUANTITY,
+  PAYOUT_MODELS,
 } from "../../domain/tournament";
 import CurrencyInput from "../../components/CurrencyInput";
 
@@ -218,6 +225,69 @@ export default function TournamentEditor({
 
                 <hr className="tournament-details-divider" />
 
+                <section id="edit-entry-payout">
+                  <h4 className="tournament-card-section-title">
+                    Payout Settings
+                  </h4>
+                  <div className="tournament-details-fields">
+                    <label className="form-field">
+                      Percent of Field to be Paid
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="any"
+                        value={draft.percentPaid ?? DEFAULT_PERCENT_PAID}
+                        disabled={saving}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            percentPaid: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      Payout Model
+                      <select
+                        value={draft.payoutModel ?? DEFAULT_PAYOUT_MODEL}
+                        disabled={saving}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            payoutModel: event.target.value,
+                          }))
+                        }
+                      >
+                        {PAYOUT_MODELS.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="tournament-flag form-field">
+                      <span>Allow User Override</span>
+                      <input
+                        type="checkbox"
+                        checked={
+                          draft.allowPayoutOverride ??
+                          DEFAULT_ALLOW_PAYOUT_OVERRIDE
+                        }
+                        disabled={saving}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            allowPayoutOverride: event.target.checked,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <hr className="tournament-details-divider" />
+
                 <div className="levels-heading" id="edit-entry-chips">
                   <h4>Available Chips</h4>
                   <button
@@ -231,6 +301,7 @@ export default function TournamentEditor({
                           {
                             color: "#ffffff",
                             denomination: "",
+                            edgeSpotQuantity: DEFAULT_EDGE_SPOT_QUANTITY,
                             availableQuantity: "",
                             quantityPerPlayer: "",
                           },
@@ -318,7 +389,8 @@ export default function TournamentEditor({
                             <td>
                               <input
                                 type="number"
-                                min="0"
+                                min={MIN_EDGE_SPOT_QUANTITY}
+                                max={MAX_EDGE_SPOT_QUANTITY}
                                 step="1"
                                 value={chip.edgeSpotQuantity}
                                 disabled={saving}

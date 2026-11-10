@@ -5,6 +5,240 @@ const curatedBlindValues = [
   300, 400, 500, 600, 750, 1000,
 ];
 
+export const DEFAULT_EDGE_SPOT_QUANTITY = 6;
+export const MIN_EDGE_SPOT_QUANTITY = 2;
+export const MAX_EDGE_SPOT_QUANTITY = 12;
+export const DEFAULT_PERCENT_PAID = 20;
+export const DEFAULT_PAYOUT_MODEL = "Standard";
+export const DEFAULT_ALLOW_PAYOUT_OVERRIDE = true;
+export const PAYOUT_MODELS = ["Standard", "Flat", "Steep"];
+export const PAYOUT_MODEL_CONSTANTS = {
+  Standard: {
+    decay: 0.317227,
+    taper: 0.331926,
+    exponent: 0.464529,
+  },
+  Flat: {
+    decay: 0.163206,
+    taper: 0.662261,
+    exponent: 2.96558,
+  },
+  Steep: {
+    decay: 0.299224,
+    taper: 0.977922,
+    exponent: 0.462913,
+  },
+};
+export const PAYOUT_ROUND_TO_TABLE = [
+  { minPayout: 5, roundTo: 1 },
+  { minPayout: 10, roundTo: 5 },
+  { minPayout: 20, roundTo: 5 },
+  { minPayout: 50, roundTo: 10 },
+  { minPayout: 100, roundTo: 25 },
+  { minPayout: 1000, roundTo: 250 },
+  { minPayout: Infinity, roundTo: 500 },
+];
+
+export function excelSequence(rows, columns = 1, start = 1, step = 1) {
+  const rowCount = Math.trunc(rows);
+  const columnCount = Math.trunc(columns);
+  if (
+    !Number.isFinite(rowCount) ||
+    rowCount < 1 ||
+    !Number.isFinite(columnCount) ||
+    columnCount < 1 ||
+    !Number.isFinite(start) ||
+    !Number.isFinite(step)
+  ) {
+    throw new RangeError("Excel SEQUENCE requires positive dimensions and finite values.");
+  }
+
+  return Array.from({ length: rowCount }, (_, rowIndex) =>
+    Array.from({ length: columnCount }, (_, columnIndex) =>
+      start + (rowIndex * columnCount + columnIndex) * step,
+    ),
+  );
+}
+
+function calculateRawPayoutValues({
+  sequence,
+  playersPaid,
+  totalPrizePool,
+  constants,
+}) {
+  if (
+    sequence.length === 0 ||
+    sequence.length !== playersPaid ||
+    !Number.isFinite(totalPrizePool) ||
+    totalPrizePool < 0 ||
+    !constants ||
+    !Number.isFinite(constants.decay) ||
+    !Number.isFinite(constants.taper) ||
+    !Number.isFinite(constants.exponent)
+  ) {
+    return null;
+  }
+
+  const weights = sequence.map((place) => {
+    const placeOffset = place - 1;
+    const exponentValue =
+      -constants.decay * placeOffset -
+      constants.taper *
+        (placeOffset / playersPaid) ** constants.exponent;
+    return Math.exp(exponentValue);
+  });
+  const totalWeight = weights.reduce((total, weight) => total + weight, 0);
+  if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+    return null;
+  }
+
+  return weights.map((weight) => (totalPrizePool * weight) / totalWeight);
+}
+
+export function calculateRawPayouts({
+  playersPaid,
+  totalPrizePool,
+  payoutModel,
+}) {
+  if (
+    !Number.isInteger(playersPaid) ||
+    playersPaid < 1 ||
+    !Number.isFinite(totalPrizePool) ||
+    totalPrizePool < 0 ||
+    !PAYOUT_MODEL_CONSTANTS[payoutModel]
+  ) {
+    return null;
+  }
+
+  const sequence = excelSequence(playersPaid).map(([place]) => place);
+  return calculateRawPayoutValues({
+    sequence,
+    playersPaid,
+    totalPrizePool,
+    constants: PAYOUT_MODEL_CONSTANTS[payoutModel],
+  });
+}
+
+export function lookupPayoutRoundTo(
+  minimumPayout,
+  table = PAYOUT_ROUND_TO_TABLE,
+) {
+  if (!Number.isFinite(minimumPayout) || minimumPayout < 0) {
+    return null;
+  }
+
+  const isValidRoundToRow = (row) =>
+    row &&
+    (Number.isFinite(row.minPayout) || row.minPayout === Infinity) &&
+    Number.isFinite(row.roundTo) &&
+    row.roundTo > 0;
+  const infinityFallback = table.find(
+    (row) => isValidRoundToRow(row) && row.minPayout === Infinity,
+  );
+  const finiteRows = table.filter(
+    (row) => isValidRoundToRow(row) && Number.isFinite(row.minPayout),
+  );
+  const highestFiniteMinPayout = finiteRows.reduce(
+    (highest, row) => Math.max(highest, row.minPayout),
+    -Infinity,
+  );
+  if (
+    infinityFallback &&
+    highestFiniteMinPayout > -Infinity &&
+    minimumPayout > highestFiniteMinPayout
+  ) {
+    return infinityFallback.roundTo;
+  }
+
+  const matchingRow = finiteRows.reduce((bestMatch, row) => {
+    if (
+      row.minPayout > minimumPayout ||
+      (bestMatch && row.minPayout <= bestMatch.minPayout)
+    ) {
+      return bestMatch;
+    }
+
+    return row;
+  }, null);
+
+  return matchingRow?.roundTo ?? null;
+}
+
+function roundAndBalancePayouts(rawPayouts, totalPrizePool) {
+  if (
+    !Array.isArray(rawPayouts) ||
+    rawPayouts.length === 0 ||
+    rawPayouts.some((payout) => !Number.isFinite(payout) || payout < 0) ||
+    !Number.isFinite(totalPrizePool) ||
+    totalPrizePool < 0
+  ) {
+    return null;
+  }
+
+  const positivePayouts = rawPayouts.filter((payout) => payout > 0);
+  if (positivePayouts.length === 0) {
+    return null;
+  }
+
+  const minimumPayout = Math.min(...positivePayouts);
+  const roundTo = lookupPayoutRoundTo(minimumPayout);
+  if (!Number.isFinite(roundTo) || roundTo <= 0) {
+    return null;
+  }
+
+  const roundedPayouts = rawPayouts.map((payout) =>
+    payout > 0 ? Math.round(payout / roundTo) * roundTo : 0,
+  );
+  const calculatedTotal = roundedPayouts.reduce(
+    (total, payout) => total + payout,
+    0,
+  );
+  const difference = totalPrizePool - calculatedTotal;
+  roundedPayouts[0] += difference;
+
+  return roundedPayouts;
+}
+
+export function calculateDefaultPayouts({
+  playersPaid,
+  totalPrizePool,
+  payoutModel,
+}) {
+  if (
+    !Number.isInteger(playersPaid) ||
+    playersPaid < 1 ||
+    !Number.isFinite(totalPrizePool) ||
+    totalPrizePool < 0 ||
+    !PAYOUT_MODELS.includes(payoutModel)
+  ) {
+    return [];
+  }
+
+  const rawPayouts = calculateRawPayouts({
+    playersPaid,
+    totalPrizePool,
+    payoutModel,
+  });
+  const calculatedPayouts =
+    rawPayouts && roundAndBalancePayouts(rawPayouts, totalPrizePool);
+
+  return (
+    calculatedPayouts ?? Array.from({ length: playersPaid }, () => null)
+  );
+}
+
+export function normalizeEdgeSpotQuantity(quantity) {
+  const parsedQuantity = Number(quantity);
+  if (!Number.isFinite(parsedQuantity) || parsedQuantity === 0) {
+    return DEFAULT_EDGE_SPOT_QUANTITY;
+  }
+
+  return Math.min(
+    MAX_EDGE_SPOT_QUANTITY,
+    Math.max(MIN_EDGE_SPOT_QUANTITY, Math.floor(parsedQuantity)),
+  );
+}
+
 export function createEmptyLevel() {
   return {
     duration: "",

@@ -12,11 +12,11 @@ export default function TournamentList({
   copyTournament,
   draft,
   editTournament,
-  expandedTournaments,
+  expandedTournamentId,
   loadingTournaments,
-  persistTournamentData,
+  onSetActive,
   saving,
-  setExpandedTournaments,
+  setExpandedTournamentId,
   tournaments,
 }) {
   return (
@@ -31,14 +31,8 @@ export default function TournamentList({
                       tournament.chips ?? [],
                       tournament.levels,
                     );
-                    const hasExpansionPreference =
-                      Object.prototype.hasOwnProperty.call(
-                        expandedTournaments,
-                        tournament.id,
-                      );
                     const isExpanded =
-                      hasExpansionPreference &&
-                      expandedTournaments[tournament.id] === true;
+                      expandedTournamentId === tournament.id;
 
                     return (
                     <li className="tournament-card" key={tournament.id}>
@@ -66,17 +60,11 @@ export default function TournamentList({
                               : ""
                           }
                           type="button"
-                          disabled={
-                            saving || activeTournamentId === tournament.id
-                          }
+                          disabled={saving}
                           aria-pressed={activeTournamentId === tournament.id}
-                          onClick={() =>
-                            persistTournamentData(tournaments, tournament.id)
-                          }
+                          onClick={() => onSetActive(tournament.id)}
                         >
-                          {activeTournamentId === tournament.id
-                            ? "Active structure"
-                            : "Set as active"}
+                          Go to Timer
                         </button>
                         <button
                           className="tournament-card-toggle"
@@ -84,14 +72,9 @@ export default function TournamentList({
                           aria-label={`${isExpanded ? "Collapse" : "Expand"} ${tournament.name}`}
                           aria-expanded={isExpanded}
                           onClick={() =>
-                            setExpandedTournaments((current) => {
-                              const currentlyExpanded =
-                                current[tournament.id] === true;
-                              return {
-                                ...current,
-                                [tournament.id]: !currentlyExpanded,
-                              };
-                            })
+                            setExpandedTournamentId((current) =>
+                              current === tournament.id ? null : tournament.id,
+                            )
                           }
                         >
                           <span

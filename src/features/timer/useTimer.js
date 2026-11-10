@@ -7,6 +7,8 @@ import {
 } from "../../domain/tournament";
 import { playTimerAlarm } from "./timerAudio";
 
+const MAX_TIMER_CHIPS = 4;
+
 export function useTimer({
   activeTab,
   activeTournament,
@@ -95,15 +97,18 @@ export function useTimer({
           currentLevel?.index,
         )
       : [];
-    const targetChips = chipsInUse.map((chip, index) => ({
-      ...chip,
-      key: `${chip.color}-${chip.denomination}-${index}`,
-    }));
+    const targetChips = chipsInUse
+      .slice(0, MAX_TIMER_CHIPS)
+      .map((chip, index) => ({
+        ...chip,
+        key: `${chip.color}-${chip.denomination}-${index}`,
+      }));
     timerChipsTargetRef.current = targetChips;
 
     setTimerChips((previousChips) => {
+      const visiblePreviousChips = previousChips.slice(0, MAX_TIMER_CHIPS);
       const previousByKey = new Map(
-        previousChips.map((chip) => [chip.key, chip]),
+        visiblePreviousChips.map((chip) => [chip.key, chip]),
       );
       const nextChips = targetChips.map((chip) => ({
         ...chip,
@@ -111,12 +116,16 @@ export function useTimer({
         isExiting: false,
       }));
       const targetKeys = new Set(targetChips.map((chip) => chip.key));
-      const exitingChips = previousChips
-        .filter((chip) => !targetKeys.has(chip.key))
-        .map((chip) => ({ ...chip, isEntering: false, isExiting: true }));
+      const hasExitingChips = visiblePreviousChips.some(
+        (chip) => !targetKeys.has(chip.key),
+      );
 
-      return exitingChips.length > 0
-        ? [...nextChips, ...exitingChips]
+      return hasExitingChips
+        ? visiblePreviousChips.map((chip) => ({
+            ...chip,
+            isEntering: targetKeys.has(chip.key) ? chip.isEntering : false,
+            isExiting: !targetKeys.has(chip.key),
+          }))
         : nextChips;
     });
   }, [activeTournament, currentLevel?.index]);

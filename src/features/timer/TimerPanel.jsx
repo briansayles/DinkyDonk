@@ -3,6 +3,7 @@ import {
   formatBlinds,
   formatChipNumber,
   formatClock,
+  normalizeEdgeSpotQuantity,
 } from "../../domain/tournament";
 
 function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
@@ -56,7 +57,9 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
         "--chip-color": chip.color, 
         "--chip-edge-spot-color": chip.edgeSpotColor ?? "#ffffff",
         "--chip-text-color": chip.textColor ?? "#ffffff",
-        "--chip-edge-spot-quantity": chip.edgeSpotQuantity ?? 6,
+        "--chip-edge-spot-quantity": normalizeEdgeSpotQuantity(
+          chip.edgeSpotQuantity,
+        ),
       }}
       onAnimationEnd={(event) => onAnimationEnd(chip.key, event.animationName)}
       role="img"
@@ -188,9 +191,9 @@ export function TimerIcon({ name }) {
           strokeLinejoin="round"
         />
       )}
-      {name === "exit-fullscreen" && (
+      {name === "exit-timer" && (
         <path
-          d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"
+          d="M13 4H5v16h8M10 12h10m-4-4 4 4-4 4"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
@@ -290,7 +293,11 @@ export default function TimerPanel({
           />
         ))}
       </div>
-      <div className="timer-clock-area">
+      <div
+        className="timer-clock-area"
+        title="Double-click to edit the blinds schedule"
+        onDoubleClick={() => onEditSection("edit-entry-levels")}
+      >
         {currentLevel ? (
           <div className={`timer-countdown timer-progress-${progressColor}`}>
             <svg
@@ -443,15 +450,15 @@ export default function TimerPanel({
             type="button"
             onClick={onToggleFullscreen}
             aria-label={
-              timerIsFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
             }
             aria-pressed={timerIsFullscreen}
             title={
-              timerIsFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
             }
           >
             <TimerIcon
-              name={timerIsFullscreen ? "exit-fullscreen" : "fullscreen"}
+              name={timerIsFullscreen ? "exit-timer" : "fullscreen"}
             />
           </button>
         </div>

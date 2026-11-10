@@ -13,7 +13,7 @@ function normalizeTournaments(tournaments) {
 export function useTournaments() {
   const [tournaments, setTournaments] = useState([]);
   const [activeTournamentId, setActiveTournamentId] = useState(null);
-  const [expandedTournaments, setExpandedTournaments] = useState({});
+  const [expandedTournamentId, setExpandedTournamentId] = useState(null);
   const [storageError, setStorageError] = useState("");
   const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -50,16 +50,6 @@ export function useTournaments() {
         ? current
         : savedTournaments.activeTournamentId,
     );
-    if (savedTournaments.activeTournamentId) {
-      setExpandedTournaments((current) =>
-        Object.prototype.hasOwnProperty.call(
-          current,
-          savedTournaments.activeTournamentId,
-        )
-          ? current
-          : { ...current, [savedTournaments.activeTournamentId]: true },
-      );
-    }
   }
 
   useEffect(() => {
@@ -168,7 +158,14 @@ export function useTournaments() {
     return saveQueueRef.current;
   }
 
-  function updateTournamentField(tournamentId, field, value, payoutIndex) {
+  function updateTournamentField(
+    tournamentId,
+    field,
+    value,
+    payoutIndex,
+    payoutPlacesForUpdate,
+    calculatedPayouts,
+  ) {
     const currentTournament = latestTournamentsRef.current.find(
       (tournament) => tournament.id === tournamentId,
     );
@@ -183,12 +180,22 @@ export function useTournaments() {
         value.trim() !== "" && Number.isFinite(parsedPayout)
           ? Math.max(0, parsedPayout)
           : 0;
+      const payoutPlaces =
+        Number.isInteger(payoutPlacesForUpdate) && payoutPlacesForUpdate > 0
+          ? payoutPlacesForUpdate
+          : currentTournament.payoutPlaces ?? 0;
+      const currentPayouts = currentTournament.payouts ?? [];
+      const payoutBaseline = currentPayouts.some(
+        (payout) => Number(payout) !== 0,
+      )
+        ? currentPayouts
+        : calculatedPayouts ?? currentPayouts;
       const payouts = Array.from(
-        { length: currentTournament.payoutPlaces ?? 0 },
+        { length: payoutPlaces },
         (_, index) =>
           index === payoutIndex
             ? amount
-            : Number(currentTournament.payouts?.[index] ?? 0),
+            : Number(payoutBaseline[index] ?? 0),
       );
       updatedFields = { payouts };
     } else if (field === "payoutPlaces") {
@@ -311,7 +318,7 @@ export function useTournaments() {
       return false;
     }
 
-    setExpandedTournaments((current) => ({ ...current, [copy.id]: true }));
+    setExpandedTournamentId(copy.id);
     return true;
   }
 
@@ -536,7 +543,7 @@ export function useTournaments() {
     copyTournament,
     deleteTournament,
     entryCountDrafts,
-    expandedTournaments,
+    expandedTournamentId,
     loadingTournaments,
     loadTournaments: reloadTournaments,
     persistTournamentData,
@@ -550,7 +557,7 @@ export function useTournaments() {
     saving,
     setActiveTournamentId,
     setEntryCountDrafts,
-    setExpandedTournaments,
+    setExpandedTournamentId,
     setPayoutDrafts,
     setPayoutPlaceDrafts,
     setStorageError,

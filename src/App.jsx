@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createEmptyLevel,
   createNextLevel,
+  calculateDefaultPayouts,
+  DEFAULT_ALLOW_PAYOUT_OVERRIDE,
+  DEFAULT_PAYOUT_MODEL,
+  DEFAULT_PERCENT_PAID,
   formatCurrency,
+  normalizeEdgeSpotQuantity,
   sortChips,
   sortLevels,
 } from "./domain/tournament";
@@ -17,7 +22,7 @@ import TournamentEditor from "./features/tournaments/TournamentEditor";
 import TournamentList from "./features/tournaments/TournamentList";
 import "./App.css";
 
-const tabs = ["Timer", "Tournament", "Settings", "About"];
+const tabs = ["Tournaments", "Settings", "About"];
 
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
@@ -35,7 +40,7 @@ function App() {
     copyTournament,
     deleteTournament: removeTournament,
     entryCountDrafts,
-    expandedTournaments,
+    expandedTournamentId,
     loadingTournaments,
     loadTournaments,
     persistTournamentData,
@@ -48,7 +53,7 @@ function App() {
     saveTournament: saveTournamentData,
     saving,
     setEntryCountDrafts,
-    setExpandedTournaments,
+    setExpandedTournamentId,
     setPayoutDrafts,
     setPayoutPlaceDrafts,
     setTableMaxDrafts,
@@ -100,6 +105,9 @@ function App() {
       addonCost: "",
       addonChipstack: "",
       addonDescription: "",
+      percentPaid: DEFAULT_PERCENT_PAID,
+      payoutModel: DEFAULT_PAYOUT_MODEL,
+      allowPayoutOverride: DEFAULT_ALLOW_PAYOUT_OVERRIDE,
       chips: [],
       levels: [createEmptyLevel()],
     });
@@ -120,12 +128,19 @@ function App() {
       addonCost: tournament.addonCost ?? "",
       addonChipstack: tournament.addonChipstack ?? "",
       addonDescription: tournament.addonDescription ?? "",
+      percentPaid: tournament.percentPaid ?? DEFAULT_PERCENT_PAID,
+      payoutModel: tournament.payoutModel ?? DEFAULT_PAYOUT_MODEL,
+      allowPayoutOverride:
+        tournament.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE,
       chips: sortChips(
         (tournament.chips ?? []).map((chip) => ({
           ...chip,
           denomination: String(chip.denomination ?? ""),
           availableQuantity: chip.availableQuantity ?? "",
           quantityPerPlayer: chip.quantityPerPlayer ?? "",
+          edgeSpotQuantity: normalizeEdgeSpotQuantity(
+            chip.edgeSpotQuantity,
+          ),
         })),
       ),
       levels: sortLevels(tournament.levels).map((level) => ({ ...level })),
@@ -140,7 +155,14 @@ function App() {
 
     editTournament(tournament);
     setEditSectionToActivate(sectionId);
-    setActiveTab("Tournament");
+    setActiveTab("Tournaments");
+  }
+
+  async function activateTournament(tournamentId) {
+    timer.enterTimerFullscreen();
+    if (await persistTournamentData(tournaments, tournamentId)) {
+      setActiveTab("Timer");
+    }
   }
 
   function updateLevel(index, field, value) {
@@ -202,6 +224,10 @@ function App() {
       addonChipstack:
         draft.addonChipstack === "" ? null : Number(draft.addonChipstack),
       addonDescription: draft.addonDescription.trim() || null,
+      percentPaid: Number(draft.percentPaid ?? DEFAULT_PERCENT_PAID),
+      payoutModel: draft.payoutModel ?? DEFAULT_PAYOUT_MODEL,
+      allowPayoutOverride:
+        draft.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE,
       buyinCount: existingTournament?.buyinCount ?? 0,
       rebuyCount: existingTournament?.rebuyCount ?? 0,
       addonCount: existingTournament?.addonCount ?? 0,
@@ -219,7 +245,9 @@ function App() {
           color: chip.color,
           edgeSpotColor: chip.edgeSpotColor ?? "#000000",
           textColor: chip.textColor ?? "#ffffff",
-          edgeSpotQuantity: chip.edgeSpotQuantity > 0 ? Number(chip.edgeSpotQuantity) : null,
+          edgeSpotQuantity: normalizeEdgeSpotQuantity(
+            chip.edgeSpotQuantity,
+          ),
           denomination: Number(chip.denomination),
           availableQuantity:
             chip.availableQuantity === ""
@@ -316,6 +344,10 @@ function App() {
             ) * Number(entry.chipstack ?? 0),
         }))
     : [];
+  const totalEntries = entryRows.reduce(
+    (total, entry) => total + Number(entry.count ?? 0),
+    0,
+  );
   const totalPrizePool = entryRows.reduce(
     (total, entry) => total + entry.contribution,
     0,
@@ -408,6 +440,18 @@ function App() {
   const payoutPlaces = Number.isFinite(parsedPayoutPlaces)
     ? Math.min(1_000, Math.max(0, Math.floor(parsedPayoutPlaces)))
     : 0;
+  const percentPaid = Number(
+    activeTournament?.percentPaid ?? DEFAULT_PERCENT_PAID,
+  );
+  const defaultPayoutPlaces = Math.max(
+    1,
+    Math.round((totalEntries * percentPaid) / 100),
+  );
+  const allowPayoutOverride =
+    activeTournament?.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE;
+  const effectivePayoutPlaces = allowPayoutOverride && payoutPlaces > 0
+    ? payoutPlaces
+    : defaultPayoutPlaces;
   const startingPlayers = Number(
     activeEntryCountDrafts.buyinCount ?? activeTournament?.buyinCount ?? 0,
   );
@@ -425,7 +469,9 @@ function App() {
     averageChipstack > 0
       ? `Average Stack: ${averageChipstack.toLocaleString()}`
       : "",
-    payoutPlaces > 0 ? `Top ${payoutPlaces.toLocaleString()} Players Paid` : "",
+    effectivePayoutPlaces > 0
+      ? `Top ${effectivePayoutPlaces.toLocaleString()} Players Paid`
+      : "",
   ].filter(Boolean);
   const timer = useTimer({
     activeTab,
@@ -461,14 +507,40 @@ function App() {
     toggleTimerFullscreen,
     totalDurationMs,
   } = timer;
-  const payouts = activeTournament
-    ? Array.from({ length: payoutPlaces }, (_, index) =>
+  const previousTimerFullscreenRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      previousTimerFullscreenRef.current &&
+      !timerIsFullscreen &&
+      activeTab === "Timer"
+    ) {
+      setActiveTab("Tournaments");
+    }
+    previousTimerFullscreenRef.current = timerIsFullscreen;
+  }, [activeTab, timerIsFullscreen]);
+
+  const defaultPayouts = calculateDefaultPayouts({
+    playersPaid: effectivePayoutPlaces,
+    totalPrizePool,
+    payoutModel: activeTournament?.payoutModel ?? DEFAULT_PAYOUT_MODEL,
+  });
+  const manualPayouts = activeTournament
+    ? Array.from({ length: effectivePayoutPlaces }, (_, index) =>
         Number(
           payoutDrafts[activeTournament.id]?.[index] ??
             activeTournament.payouts?.[index] ??
             0,
         ),
       )
+    : [];
+  const hasManualPayouts = manualPayouts.some((payout) => payout !== 0);
+  const useCalculatedPayouts =
+    !allowPayoutOverride || !hasManualPayouts;
+  const payouts = activeTournament
+    ? useCalculatedPayouts
+      ? defaultPayouts.map((payout) => Number(payout ?? 0))
+      : manualPayouts
     : [];
   const payoutTotal = payouts.reduce((total, payout) => total + payout, 0);
   const payoutIncrement =
@@ -517,8 +589,13 @@ function App() {
         ref={timerPanelRef}
         id="active-panel"
         className={`tab-panel${activeTab === "Timer" ? ` timer-tab-panel${startedAt !== null ? " timer-tab-panel-active" : ""}` : ""}`}
-        role="tabpanel"
-        aria-labelledby={`tab-${activeTab.toLowerCase()}`}
+        role={activeTab === "Timer" ? "region" : "tabpanel"}
+        aria-label={activeTab === "Timer" ? "Tournament timer" : undefined}
+        aria-labelledby={
+          activeTab === "Timer"
+            ? undefined
+            : `tab-${activeTab.toLowerCase()}`
+        }
       >
         {activeTab !== "Timer" && <h2>{activeTab}</h2>}
         {activeTab === "Timer" && timerFullscreenError && (
@@ -545,7 +622,7 @@ function App() {
             timerSettingsError={timerSettingsError}
             timerSettingsLoaded={timerSettingsLoaded}
           />
-        ) : activeTab === "Tournament" ? (
+        ) : activeTab === "Tournaments" ? (
           <div className="tournament-manager">
             {storageError && (
               <p className="storage-error" role="alert">
@@ -584,11 +661,11 @@ function App() {
               copyTournament={copyTournament}
               draft={draft}
               editTournament={editTournament}
-              expandedTournaments={expandedTournaments}
+              expandedTournamentId={expandedTournamentId}
               loadingTournaments={loadingTournaments}
-              persistTournamentData={persistTournamentData}
+              onSetActive={activateTournament}
               saving={saving}
-              setExpandedTournaments={setExpandedTournaments}
+              setExpandedTournamentId={setExpandedTournamentId}
               tournaments={tournaments}
             />
           </div>
@@ -961,10 +1038,17 @@ function App() {
                             min="0"
                             max="1000"
                             step="1"
+                            title={`Calculated: ${defaultPayoutPlaces} players to be paid`}
+                            disabled={!allowPayoutOverride}
                             value={
-                              payoutPlaceDrafts[activeTournament.id] ??
-                              activeTournament.payoutPlaces ??
-                              0
+                              !allowPayoutOverride
+                                ? defaultPayoutPlaces
+                                : payoutPlaceDrafts[activeTournament.id] !==
+                                    undefined
+                                  ? payoutPlaceDrafts[activeTournament.id]
+                                  : payoutPlaces > 0
+                                    ? payoutPlaces
+                                    : defaultPayoutPlaces
                             }
                             aria-label="Number of players paid"
                             onChange={(event) => {
@@ -992,7 +1076,7 @@ function App() {
                           className="timer-entry-reset"
                           type="button"
                           onClick={() => resetPayouts(activeTournament)}
-                          disabled={saving}
+                          disabled={saving || !allowPayoutOverride}
                           aria-label="Reset payouts"
                           title="Reset payouts"
                         >
@@ -1023,7 +1107,17 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <table className="timer-payout-table" id="timer-payout-table">
+                    <table
+                      className="timer-payout-table"
+                      id="timer-payout-table"
+                      title="Double-click to edit payout settings"
+                      onDoubleClick={() =>
+                        editTournamentSection(
+                          activeTournament.id,
+                          "edit-entry-payout",
+                        )
+                      }
+                    >
                       {!payoutsCollapsed && <thead>
                         <tr>
                           <th scope="col">Place</th>
@@ -1037,12 +1131,15 @@ function App() {
                             <td>
                               <CurrencyInput
                                 step={payoutIncrement}
-                                value={
-                                  payoutDrafts[activeTournament.id]?.[index] ??
-                                  activeTournament.payouts?.[index] ??
-                                  0
-                                }
+                                value={payouts[index] ?? 0}
+                                disabled={!allowPayoutOverride}
                                 aria-label={`Payout for place ${index + 1}`}
+                                title={
+                                  defaultPayouts?.[index] === null ||
+                                  defaultPayouts?.[index] === undefined
+                                    ? "Calculated: pending"
+                                    : `Calculated: ${formatCurrency(defaultPayouts[index])}`
+                                }
                                 onChange={(value) => {
                                   const nextDrafts = [
                                     ...(payoutDrafts[activeTournament.id] ?? []),
@@ -1057,6 +1154,8 @@ function App() {
                                     "payout",
                                     value,
                                     index,
+                                    effectivePayoutPlaces,
+                                    defaultPayouts,
                                   );
                                 }}
                                 onBlur={() => {
@@ -1207,7 +1306,7 @@ function App() {
                 <p>No active structure selected.</p>
                 <button
                   type="button"
-                  onClick={() => setActiveTab("Tournament")}
+                  onClick={() => setActiveTab("Tournaments")}
                 >
                   Choose a tournament structure
                 </button>

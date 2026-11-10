@@ -49,8 +49,7 @@ export default function AboutPanel() {
           alt="DinkyDonk logo"
         />
         <p>
-          DinkyDonk is free and open-source software: a desktop poker
-          tournament timer and manager built with Tauri, React, and Vite.
+            DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
         </p>
       </header>
 

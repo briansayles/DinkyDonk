@@ -136,6 +136,12 @@ struct Tournament {
     payout_places: u32,
     #[serde(default)]
     payouts: Vec<f64>,
+    #[serde(default = "default_percent_paid")]
+    percent_paid: f64,
+    #[serde(default = "default_payout_model")]
+    payout_model: String,
+    #[serde(default = "default_allow_payout_override")]
+    allow_payout_override: bool,
     #[serde(default)]
     max_players_per_table: u32,
     #[serde(default)]
@@ -147,6 +153,18 @@ struct Tournament {
     timer_started_at: Option<f64>,
     #[serde(default)]
     timer_elapsed_ms: Option<f64>,
+}
+
+fn default_percent_paid() -> f64 {
+    20.0
+}
+
+fn default_payout_model() -> String {
+    "Standard".to_string()
+}
+
+fn default_allow_payout_override() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize)]
