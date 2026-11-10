@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   formatBlinds,
   formatChipNumber,
@@ -108,8 +108,66 @@ function TimerClock({ remainingMs }) {
 
   return (
     <p ref={clockRef} className="timer-clock" aria-live="off">
-      {text}
+      <span key={text} className="timer-clock-value">
+        {text}
+      </span>
     </p>
+  );
+}
+
+function AnimatedBlindValue({ className, direction, value }) {
+  const previousValueRef = useRef(value);
+  const transitionTimeoutRef = useRef(null);
+  const [transition, setTransition] = useState(null);
+
+  useLayoutEffect(() => {
+    const previousValue = previousValueRef.current;
+    previousValueRef.current = value;
+
+    if (previousValue === value) {
+      return;
+    }
+
+    window.clearTimeout(transitionTimeoutRef.current);
+    if (!previousValue.trim()) {
+      transitionTimeoutRef.current = null;
+      setTransition(null);
+      return;
+    }
+
+    setTransition({ value: previousValue, direction });
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      transitionTimeoutRef.current = null;
+      setTransition(null);
+    }, 1200);
+  }, [direction, value]);
+
+  useLayoutEffect(
+    () => () => window.clearTimeout(transitionTimeoutRef.current),
+    [],
+  );
+
+  return (
+    <>
+      {transition !== null && (
+        <span
+          key={`leaving-${transition.value}-${transition.direction}`}
+          className={`${className} ${className}-leaving-${transition.direction}`}
+          aria-hidden="true"
+        >
+          {transition.value}
+        </span>
+      )}
+      <span
+        className={
+          transition === null
+            ? className
+            : `${className} ${className}-entering-${transition.direction}`
+        }
+      >
+        {value}
+      </span>
+    </>
   );
 }
 
@@ -232,11 +290,43 @@ export default function TimerPanel({
   timerSettings,
   totalDurationMs,
 }) {
+  const currentLevelIndex = currentLevel?.index ?? null;
+  const previousLevelIndexRef = useRef(currentLevelIndex);
+  const blindsDirection =
+    currentLevelIndex !== null &&
+    previousLevelIndexRef.current !== null &&
+    currentLevelIndex < previousLevelIndexRef.current
+      ? "down"
+      : "up";
+
+  useLayoutEffect(() => {
+    previousLevelIndexRef.current = currentLevelIndex;
+  }, [currentLevelIndex]);
+
+  const currentBlindsText = !currentLevel
+    ? "\u00a0"
+    : currentLevel.level.isBreak
+      ? "BREAK"
+      : formatBlinds(
+          currentLevel.level.smallBlind,
+          currentLevel.level.bigBlind,
+          currentLevel.level.ante,
+        );
+  const nextBlindsText = !nextLevel
+    ? "Last Level"
+    : nextLevel.level.isBreak
+      ? "BREAK"
+      : formatBlinds(
+          nextLevel.level.smallBlind,
+          nextLevel.level.bigBlind,
+          nextLevel.level.ante,
+        );
+
   return (
     <div className="timer-display">
       <div className="timer-current-blinds-row">
         <div className="timer-current-blinds-logo-slot">
-          <img src="/dinkydonk-logo.svg" alt="DinkyDonk" />
+          <img src="/dinkydonk-logo.png" alt="DinkyDonk" />
         </div>
         <div
           className="timer-blinds-group"
@@ -245,15 +335,11 @@ export default function TimerPanel({
           onDoubleClick={() => onEditSection("edit-entry-levels")}
         >
           <p className="timer-blinds" aria-hidden={!currentLevel}>
-            {!currentLevel
-              ? "\u00a0"
-              : currentLevel.level.isBreak
-                ? "BREAK"
-                : formatBlinds(
-                    currentLevel.level.smallBlind,
-                    currentLevel.level.bigBlind,
-                    currentLevel.level.ante,
-                  )}
+            <AnimatedBlindValue
+              className="timer-blinds-value"
+              direction={blindsDirection}
+              value={currentBlindsText}
+            />
           </p>
           <p className="timer-blinds-label">Current Blinds</p>
         </div>
@@ -301,15 +387,11 @@ export default function TimerPanel({
           onDoubleClick={() => onEditSection("edit-entry-levels")}
         >
           <p className="timer-next-blinds">
-            {!nextLevel
-              ? "Last Level"
-              : nextLevel.level.isBreak
-                ? "BREAK"
-                : formatBlinds(
-                    nextLevel.level.smallBlind,
-                    nextLevel.level.bigBlind,
-                    nextLevel.level.ante,
-                  )}
+            <AnimatedBlindValue
+              className="timer-next-blinds-value"
+              direction={blindsDirection}
+              value={nextBlindsText}
+            />
           </p>
           <p className="timer-next-blinds-label">Next Blinds</p>
         </div>

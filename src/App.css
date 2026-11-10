@@ -161,6 +161,17 @@
 .timer-tab-panel-active .timer-blinds-group,
 .timer-tab-panel-active .timer-next-blinds-group,
 .timer-tab-panel-active .timer-clock,
+.timer-tab-panel-active .timer-clock-value,
+.timer-tab-panel-active .timer-blinds-value,
+.timer-tab-panel-active .timer-next-blinds-value,
+.timer-tab-panel-active .timer-blinds-value-entering-up,
+.timer-tab-panel-active .timer-blinds-value-entering-down,
+.timer-tab-panel-active .timer-blinds-value-leaving-up,
+.timer-tab-panel-active .timer-blinds-value-leaving-down,
+.timer-tab-panel-active .timer-next-blinds-value-entering-up,
+.timer-tab-panel-active .timer-next-blinds-value-entering-down,
+.timer-tab-panel-active .timer-next-blinds-value-leaving-up,
+.timer-tab-panel-active .timer-next-blinds-value-leaving-down,
 .timer-tab-panel-active .timer-message,
 .timer-tab-panel-active .timer-entry-heading h3,
 .timer-tab-panel-active .timer-entry-table thead th,
@@ -247,6 +258,10 @@
 
 .timer-tab-panel-active .timer-volume-control input {
   accent-color: currentColor;
+}
+
+.timer-tab-panel-active .timer-volume-control {
+  color: var(--timer-complementary-text-color);
 }
 
 .timer-tab-panel:fullscreen {
@@ -937,7 +952,7 @@
 
 .timer-chip {
   display: grid;
-  width: min(100%, 18vh, 10rem);
+  width: min(100%, 20.52vh, 11.4rem);
   aspect-ratio: 1;
   flex: 0 0 auto;
   place-items: center;
@@ -1037,6 +1052,8 @@
 }
 
 .timer-blinds {
+  position: relative;
+  overflow: visible;
   width: fit-content;
   max-width: 100%;
   min-height: 1.1em;
@@ -1047,6 +1064,146 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
+}
+
+.timer-clock-value,
+.timer-blinds-value-entering-up,
+.timer-blinds-value-entering-down,
+.timer-next-blinds-value-entering-up,
+.timer-next-blinds-value-entering-down {
+  display: inline-block;
+}
+
+.timer-clock-value {
+  animation: timer-value-change 180ms ease-out both;
+}
+
+.timer-blinds-value-entering-up,
+.timer-next-blinds-value-entering-up {
+  animation: timer-blinds-drift-in-up 800ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.timer-blinds-value-entering-down,
+.timer-next-blinds-value-entering-down {
+  animation: timer-blinds-drift-in-down 800ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.timer-blinds-value-leaving-up,
+.timer-blinds-value-leaving-down,
+.timer-next-blinds-value-leaving-up,
+.timer-next-blinds-value-leaving-down {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.timer-blinds-value-leaving-up {
+  animation: timer-current-blinds-drift-out-up 1100ms
+    cubic-bezier(0.45, 0, 0.85, 0.3) both;
+}
+
+.timer-blinds-value-leaving-down {
+  animation: timer-current-blinds-drift-out-down 1100ms
+    cubic-bezier(0.45, 0, 0.85, 0.3) both;
+}
+
+.timer-next-blinds-value-leaving-up {
+  animation: timer-next-blinds-drift-up 800ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+.timer-next-blinds-value-leaving-down {
+  animation: timer-next-blinds-drift-down 800ms
+    cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+@keyframes timer-value-change {
+  from {
+    opacity: 0.55;
+    transform: translateY(0.08em);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes timer-blinds-drift-in-up {
+  from {
+    opacity: 0.45;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes timer-blinds-drift-in-down {
+  from {
+    opacity: 0.45;
+    transform: translateY(-100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes timer-current-blinds-drift-out-up {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-100vh);
+  }
+}
+
+@keyframes timer-current-blinds-drift-out-down {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes timer-next-blinds-drift-up {
+  from {
+    opacity: 0.75;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-180%);
+  }
+}
+
+@keyframes timer-next-blinds-drift-down {
+  from {
+    opacity: 0.75;
+    transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(180%);
+  }
 }
 
 .timer-blinds-label,

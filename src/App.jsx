@@ -746,7 +746,7 @@ function App() {
       <header className="app-heading">
         <img
           className="app-heading-logo"
-          src="/dinkydonk-logo.svg"
+          src="/dinkydonk-logo.png"
           alt="DinkyDonk logo"
         />
         <div className="app-heading-copy">

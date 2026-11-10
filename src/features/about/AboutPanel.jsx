@@ -45,7 +45,7 @@ export default function AboutPanel() {
       <header className="about-intro">
         <img
           className="about-logo"
-          src="/dinkydonk-logo.svg"
+          src="/dinkydonk-logo.png"
           alt="DinkyDonk logo"
         />
         <p>
