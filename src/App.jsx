@@ -1111,12 +1111,19 @@ function App() {
                       className="timer-payout-table"
                       id="timer-payout-table"
                       title="Double-click to edit payout settings"
-                      onDoubleClick={() =>
+                      onDoubleClick={(event) => {
+                        if (
+                          event.target instanceof Element &&
+                          event.target.closest("input, textarea, select")
+                        ) {
+                          return;
+                        }
+
                         editTournamentSection(
                           activeTournament.id,
                           "edit-entry-payout",
-                        )
-                      }
+                        );
+                      }}
                     >
                       {!payoutsCollapsed && <thead>
                         <tr>

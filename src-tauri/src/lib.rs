@@ -387,7 +387,19 @@ pub fn run() {
         .manage(KeepAwakeController {
             sender: keep_awake_sender,
         })
-        .setup(move |_app| {
+        .setup(move |app| {
+            #[cfg(desktop)]
+            {
+                let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))?;
+                let window = app.get_webview_window("main").ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "Could not find the main window to set its icon",
+                    )
+                })?;
+                window.set_icon(icon)?;
+            }
+
             std::thread::Builder::new()
                 .name("keep-awake-controller".to_string())
                 .spawn(move || {
