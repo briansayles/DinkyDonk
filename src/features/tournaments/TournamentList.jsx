@@ -23,9 +23,11 @@ export default function TournamentList({
     <>
             {!draft &&
               (!loadingTournaments && tournaments.length === 0 ? (
-                <p className="empty-state">No tournament structures yet.</p>
+                <p className="empty-state" data-tour="empty-structures">
+                  No tournament structures yet.
+                </p>
               ) : tournaments.length > 0 ? (
-                <ul className="tournament-list">
+                <ul className="tournament-list" data-tour="saved-structures">
                   {tournaments.map((tournament) => {
                     const colorUpsByLevel = getChipColorUpsByLevel(
                       tournament.chips ?? [],

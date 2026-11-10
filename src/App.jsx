@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Joyride, STATUS } from "react-joyride";
+import { invoke } from "@tauri-apps/api/core";
 import {
-  createEmptyLevel,
   createNextLevel,
   calculateDefaultPayouts,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
@@ -23,10 +24,47 @@ import TournamentList from "./features/tournaments/TournamentList";
 import "./App.css";
 
 const tabs = ["Tournaments", "Settings", "About"];
+const userTourStorageKey = "dinkydonk-user-tour-seen";
+
+function createTournamentDraft(tournament) {
+  return {
+    name: tournament.name,
+    startingChipstack: tournament.startingChipstack ?? "",
+    rebuysAllowed: tournament.rebuysAllowed ?? false,
+    addonsAllowed: tournament.addonsAllowed ?? false,
+    buyinCost: tournament.buyinCost ?? "",
+    buyinDescription: tournament.buyinDescription ?? "",
+    rebuyCost: tournament.rebuyCost ?? "",
+    rebuyChipstack: tournament.rebuyChipstack ?? "",
+    rebuyDescription: tournament.rebuyDescription ?? "",
+    addonCost: tournament.addonCost ?? "",
+    addonChipstack: tournament.addonChipstack ?? "",
+    addonDescription: tournament.addonDescription ?? "",
+    percentPaid: tournament.percentPaid ?? DEFAULT_PERCENT_PAID,
+    payoutModel: tournament.payoutModel ?? DEFAULT_PAYOUT_MODEL,
+    allowPayoutOverride:
+      tournament.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE,
+    chips: sortChips(
+      (tournament.chips ?? []).map((chip) => ({
+        ...chip,
+        denomination: String(chip.denomination ?? ""),
+        availableQuantity: chip.availableQuantity ?? "",
+        quantityPerPlayer: chip.quantityPerPlayer ?? "",
+        edgeSpotQuantity: normalizeEdgeSpotQuantity(
+          chip.edgeSpotQuantity,
+        ),
+      })),
+    ),
+    levels: sortLevels(tournament.levels).map((level) => ({ ...level })),
+  };
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [runUserTour, setRunUserTour] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [creatingStructure, setCreatingStructure] = useState(false);
+  const [structureCreationError, setStructureCreationError] = useState("");
   const [editSectionToActivate, setEditSectionToActivate] = useState(null);
   const [draft, setDraft] = useState(null);
   const [entriesCollapsed, setEntriesCollapsed] = useState(false);
@@ -76,6 +114,186 @@ function App() {
   } = useTimerSettings(loadTournaments);
 
   useEffect(() => {
+    if (!loadingTournaments && localStorage.getItem(userTourStorageKey) !== "true") {
+      setRunUserTour(true);
+    }
+  }, [loadingTournaments]);
+
+  const userTourSteps = useMemo(() => [
+    {
+      target: '[data-tour="app-title"]',
+      content:
+        "Welcome to Dinky Donk, a tournament timer for managing your structure, entries, and payouts.",
+      placement: "bottom",
+      skipBeacon: true,
+    },
+    {
+      target: "#tab-tournaments",
+      content:
+        "Manage your tournament structures here. The Settings and About tabs are available from this navigation.",
+      placement: "bottom",
+    },
+    ...(!draft
+      ? [
+          {
+            target: '[data-tour="create-structure"]',
+            content:
+              "Create a structure prefilled with the starter stack, chips, and blind schedule, then customize it.",
+            placement: "bottom",
+          },
+          {
+            target:
+              tournaments.length > 0
+                ? '[data-tour="saved-structures"]'
+                : '[data-tour="empty-structures"]',
+            content:
+              "Saved structures appear here. Choose Go to Timer on a structure to open its fullscreen tournament timer.",
+            placement: "top",
+            before: async () => {
+              if (document.fullscreenElement === timer.timerPanelRef.current) {
+                await timer.toggleTimerFullscreen();
+              }
+              setActiveTab("Tournaments");
+              await new Promise((resolve) => requestAnimationFrame(resolve));
+            },
+          },
+        ]
+      : []),
+    ...(activeTournament && !draft
+      ? [
+          {
+            target: '[data-tour="timer-clock-area"]',
+            content:
+              "The timer displays the time remaining in the current blind level. The timer screen's background and text colors change as the level progresses.",
+            placement: "top",
+            before: async () => {
+              setActiveTab("Timer");
+              await new Promise((resolve) => requestAnimationFrame(resolve));
+              await timer.enterTimerFullscreen();
+              await new Promise((resolve) => requestAnimationFrame(resolve));
+            },
+          },
+          {
+            target: '[data-tour="timer-blinds"]',
+            content: "See the current and next blind level's small blind, big blind, and ante. Double-click to edit the blinds schedule.",
+            placement: "top",
+          },
+          {
+            target: '[data-tour="timer-chips"]',
+            content: "See the chips in play for the current level. Chips that aren't in use are removed from this area. " +
+              "Chips that won't be in use in the next level fade in and out.",
+            placement: "top",
+          },
+          {
+            target: '[data-tour="timer-transport-controls"]',
+            content: "Control the tournament clock: play, pause, reset, and navigate between levels. Adjust the alarms volume using the slider.",
+            placement: "top",
+          },
+          // {
+          //   target: '[data-tour="timer-reset"]',
+          //   content:
+          //     "Reset the whole timer back to the start of the tournament.",
+          //   placement: "top",
+          // },
+          // {
+          //   target: '[data-tour="timer-previous-level"]',
+          //   content: "Rewind to the previous blind level.",
+          //   placement: "top",
+          // },
+          // {
+          //   target: '[data-tour="timer-reset-level"]',
+          //   content: "Restart the current level's clock without changing levels.",
+          //   placement: "top",
+          // },
+
+          // {
+          //   target: '[data-tour="timer-next-level"]',
+          //   content: "Skip ahead to the next blind level.",
+          //   placement: "top",
+          // },
+          // {
+          //   target: '[data-tour="timer-volume"]',
+          //   content: "Adjust the volume of the alarms and spoken timer announcements.",
+          //   placement: "top",
+          // },
+          {
+            target: '[data-tour="timer-entries"]',
+            content:
+              "Track buy-ins, rebuys, and add-ons here. Only enabled buy types are shown. Use the 'Other' category for any miscellaneous entries. Change each count to update chips in play and the prize pool.",
+            placement: "left",
+          },
+          {
+            target: '[data-tour="timer-paid-places"]',
+            content:
+              "Set how many players get paid. The calculated number is used unless you override it.",
+            placement: "left",
+          },
+          {
+            target: '[data-tour="timer-payouts"]',
+            content:
+              "Review or adjust each payout. Hover over an amount to see its calculated value based on the current settings. Manual editing is allowed if overrides are enabled.",
+            placement: "left",
+          },
+          {
+            target: '[data-tour="timer-bustouts"]',
+            content:
+              "Track or adjust bustouts here. Bustouts are used to calculate the remaining players and average stack.",
+            placement: "left",
+          },
+          {
+            target: '[data-tour="timer-tables-max"]',
+            content:
+              "Set the maximum number of players per table for the tournament. This helps in calculating the distribution of players across tables.",
+            placement: "left",
+          },
+          {
+            target: '[data-tour="timer-fullscreen"]',
+            content:
+              "Click here to exit the timer. Alternately, move your mouse to the top edge of the screen and hold it there to exit.",
+            placement: "bottom",
+          },
+          {
+            target: '[data-tour="timer-support"]',
+            content:
+              "Scan or click to buy the developer a coffee. The timer runs on caffeine!",
+            placement: "bottom",
+          },
+        ]
+      : []),
+    {
+      target: "#tab-settings",
+      content:
+        "Adjust timer behavior and other app preferences in Settings.",
+      placement: "bottom",
+      before: async () => {
+        if (document.fullscreenElement === timer.timerPanelRef.current) {
+          await timer.toggleTimerFullscreen();
+        }
+        setActiveTab("Settings");
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      },
+    },
+    {
+      target: '[data-tour="tour-launcher"]',
+      content: "You can restart this tour any time with this button.",
+      placement: "bottom",
+    },
+  ], [activeTournament, draft, tournaments.length]);
+
+  function startUserTour() {
+    setActiveTab("Tournaments");
+    setRunUserTour(true);
+  }
+
+  function handleUserTourCallback({ status }) {
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      localStorage.setItem(userTourStorageKey, "true");
+      setRunUserTour(false);
+      setActiveTab("Tournaments");
+    }
+  }
+
+  useEffect(() => {
     if (!draft || !editingId || !editSectionToActivate) {
       return;
     }
@@ -90,61 +308,29 @@ function App() {
     setEditSectionToActivate(null);
   }, [draft, editSectionToActivate, editingId]);
 
-  function startNewTournament() {
+  async function startNewTournament() {
+    setStructureCreationError("");
+    setCreatingStructure(true);
     setEditingId(null);
-    setDraft({
-      name: "",
-      startingChipstack: "",
-      rebuysAllowed: false,
-      addonsAllowed: false,
-      buyinCost: "",
-      buyinDescription: "",
-      rebuyCost: "",
-      rebuyChipstack: "",
-      rebuyDescription: "",
-      addonCost: "",
-      addonChipstack: "",
-      addonDescription: "",
-      percentPaid: DEFAULT_PERCENT_PAID,
-      payoutModel: DEFAULT_PAYOUT_MODEL,
-      allowPayoutOverride: DEFAULT_ALLOW_PAYOUT_OVERRIDE,
-      chips: [],
-      levels: [createEmptyLevel()],
-    });
+    try {
+      const defaultTournament = await invoke(
+        "get_default_tournament_structure",
+      );
+      setDraft(createTournamentDraft(defaultTournament));
+    } catch (error) {
+      console.error("Could not load the default tournament structure.", error);
+      setStructureCreationError(
+        "The default tournament structure could not be loaded.",
+      );
+    } finally {
+      setCreatingStructure(false);
+    }
   }
 
   function editTournament(tournament) {
+    setStructureCreationError("");
     setEditingId(tournament.id);
-    setDraft({
-      name: tournament.name,
-      startingChipstack: tournament.startingChipstack ?? "",
-      rebuysAllowed: tournament.rebuysAllowed ?? false,
-      addonsAllowed: tournament.addonsAllowed ?? false,
-      buyinCost: tournament.buyinCost ?? "",
-      buyinDescription: tournament.buyinDescription ?? "",
-      rebuyCost: tournament.rebuyCost ?? "",
-      rebuyChipstack: tournament.rebuyChipstack ?? "",
-      rebuyDescription: tournament.rebuyDescription ?? "",
-      addonCost: tournament.addonCost ?? "",
-      addonChipstack: tournament.addonChipstack ?? "",
-      addonDescription: tournament.addonDescription ?? "",
-      percentPaid: tournament.percentPaid ?? DEFAULT_PERCENT_PAID,
-      payoutModel: tournament.payoutModel ?? DEFAULT_PAYOUT_MODEL,
-      allowPayoutOverride:
-        tournament.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE,
-      chips: sortChips(
-        (tournament.chips ?? []).map((chip) => ({
-          ...chip,
-          denomination: String(chip.denomination ?? ""),
-          availableQuantity: chip.availableQuantity ?? "",
-          quantityPerPlayer: chip.quantityPerPlayer ?? "",
-          edgeSpotQuantity: normalizeEdgeSpotQuantity(
-            chip.edgeSpotQuantity,
-          ),
-        })),
-      ),
-      levels: sortLevels(tournament.levels).map((level) => ({ ...level })),
-    });
+    setDraft(createTournamentDraft(tournament));
   }
 
   function editTournamentSection(tournamentId, sectionId) {
@@ -557,7 +743,52 @@ function App() {
     Math.round(payoutTotal * 100) === Math.round(totalPrizePool * 100);
   return (
     <main className="container">
-      <h1>Dinky Donk Tournament Timer</h1>
+      <header className="app-heading">
+        <img
+          className="app-heading-logo"
+          src="/dinkydonk-logo.svg"
+          alt="DinkyDonk logo"
+        />
+        <div className="app-heading-copy">
+          <h1 data-tour="app-title">
+            DinkyDonk Poker Tournament Timer and Manager
+          </h1>
+          <p className="app-heading-tagline">
+            DinkyDonk is Free and Open-Source
+          </p>
+        </div>
+        <button
+          className="app-tour-button"
+          data-tour="tour-launcher"
+          type="button"
+          onClick={startUserTour}
+        >
+          Take a tour
+        </button>
+      </header>
+
+      <Joyride
+        onEvent={handleUserTourCallback}
+        continuous
+        portalElement={
+          timer.timerIsFullscreen ? timer.timerPanelRef.current : undefined
+        }
+        run={runUserTour}
+        steps={userTourSteps}
+        options={{
+          buttons: ["back", "primary", "skip"],
+          primaryColor: "#396cd8",
+          showProgress: true,
+          zIndex: 10000,
+        }}
+        locale={{
+          back: "Back",
+          close: "Close",
+          last: "Finish",
+          next: "Next",
+          skip: "Skip tour",
+        }}
+      />
 
       <nav
         className="tab-navigation"
@@ -629,15 +860,21 @@ function App() {
                 {storageError}
               </p>
             )}
+            {structureCreationError && (
+              <p className="storage-error" role="alert">
+                {structureCreationError}
+              </p>
+            )}
             {!draft && (
               <div className="tournament-heading">
                 <p>Manage tournament structures and their blind levels.</p>
                 <button
+                  data-tour="create-structure"
                   type="button"
                   onClick={startNewTournament}
-                  disabled={loadingTournaments || saving}
+                  disabled={loadingTournaments || saving || creatingStructure}
                 >
-                  Create structure
+                  {creatingStructure ? "Loading template..." : "Create structure"}
                 </button>
               </div>
             )}
@@ -656,18 +893,20 @@ function App() {
               updateLevel={updateLevel}
             />
 
-            <TournamentList
-              activeTournamentId={activeTournamentId}
-              copyTournament={copyTournament}
-              draft={draft}
-              editTournament={editTournament}
-              expandedTournamentId={expandedTournamentId}
-              loadingTournaments={loadingTournaments}
-              onSetActive={activateTournament}
-              saving={saving}
-              setExpandedTournamentId={setExpandedTournamentId}
-              tournaments={tournaments}
-            />
+            <div data-tour="tournament-structures">
+              <TournamentList
+                activeTournamentId={activeTournamentId}
+                copyTournament={copyTournament}
+                draft={draft}
+                editTournament={editTournament}
+                expandedTournamentId={expandedTournamentId}
+                loadingTournaments={loadingTournaments}
+                onSetActive={activateTournament}
+                saving={saving}
+                setExpandedTournamentId={setExpandedTournamentId}
+                tournaments={tournaments}
+              />
+            </div>
           </div>
         ) : (
           <div
@@ -743,7 +982,11 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <table className="timer-entry-table" id="timer-entry-table">
+                    <table
+                      className="timer-entry-table"
+                      id="timer-entry-table"
+                      data-tour="timer-entries"
+                    >
                       <thead>
                         <tr>
                           <th scope="col">Type</th>
@@ -920,6 +1163,7 @@ function App() {
                           <span>Busted</span>
                           <input
                             type="number"
+                            data-tour="timer-bustouts"
                             min="0"
                             max={Math.max(
                               0,
@@ -1051,6 +1295,7 @@ function App() {
                                     : defaultPayoutPlaces
                             }
                             aria-label="Number of players paid"
+                            data-tour="timer-paid-places"
                             onChange={(event) => {
                               setPayoutPlaceDrafts((drafts) => ({
                                 ...drafts,
@@ -1110,6 +1355,7 @@ function App() {
                     <table
                       className="timer-payout-table"
                       id="timer-payout-table"
+                      data-tour="timer-payouts"
                       title="Double-click to edit payout settings"
                       onDoubleClick={(event) => {
                         if (
@@ -1210,6 +1456,7 @@ function App() {
                         <label className="timer-payout-places">
                           <span>Max/Table</span>
                           <input
+                            data-tour="timer-tables-max"
                             type="number"
                             min="0"
                             step="1"

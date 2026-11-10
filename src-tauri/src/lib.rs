@@ -174,6 +174,115 @@ struct TournamentData {
     active_tournament_id: Option<String>,
 }
 
+fn default_tournament_structure() -> Tournament {
+    let levels = [
+        (2.0, 4.0),
+        (3.0, 6.0),
+        (4.0, 8.0),
+        (5.0, 10.0),
+        (10.0, 20.0),
+        (15.0, 30.0),
+        (20.0, 50.0),
+        (30.0, 60.0),
+        (40.0, 80.0),
+        (50.0, 100.0),
+        (75.0, 150.0),
+        (100.0, 200.0),
+    ]
+    .into_iter()
+    .map(|(small_blind, big_blind)| TournamentLevel {
+        duration: Some(15.0),
+        small_blind: Some(small_blind),
+        big_blind: Some(big_blind),
+        ante: Some(0.0),
+        is_break: false,
+    })
+    .collect();
+    let chips = vec![
+        TournamentChip {
+            color: "#ffffff".to_string(),
+            text_color: Some("#000000".to_string()),
+            edge_spot_color: Some("#000000".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 1.0,
+            available_quantity: None,
+            quantity_per_player: None,
+        },
+        TournamentChip {
+            color: "#ff0000".to_string(),
+            text_color: Some("#ffffff".to_string()),
+            edge_spot_color: Some("#ffffff".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 5.0,
+            available_quantity: None,
+            quantity_per_player: None,
+        },
+        TournamentChip {
+            color: "#008000".to_string(),
+            text_color: Some("#ffffff".to_string()),
+            edge_spot_color: Some("#ffffff".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 25.0,
+            available_quantity: None,
+            quantity_per_player: None,
+        },
+        TournamentChip {
+            color: "#000000".to_string(),
+            text_color: Some("#ffffff".to_string()),
+            edge_spot_color: Some("#ffffff".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 100.0,
+            available_quantity: None,
+            quantity_per_player: None,
+        },
+    ];
+    Tournament {
+        id: "my-first-dinkydonk-tournament".to_string(),
+        name: "DinkyDonk Default Tournament".to_string(),
+        starting_chipstack: Some(500.0),
+        rebuys_allowed: false,
+        addons_allowed: false,
+        buyin_cost: Some(20.0),
+        buyin_description: None,
+        rebuy_cost: None,
+        rebuy_chipstack: None,
+        rebuy_description: None,
+        addon_cost: None,
+        addon_chipstack: None,
+        addon_description: None,
+        buyin_count: 0,
+        rebuy_count: 0,
+        addon_count: 0,
+        other_prize_pool: 0.0,
+        other_chipstack: 0.0,
+        bustout_count: 0,
+        payout_places: 0,
+        payouts: Vec::new(),
+        percent_paid: default_percent_paid(),
+        payout_model: default_payout_model(),
+        allow_payout_override: default_allow_payout_override(),
+        max_players_per_table: 0,
+        chips,
+        levels,
+        timer_is_running: false,
+        timer_started_at: None,
+        timer_elapsed_ms: None,
+    }
+}
+
+fn default_tournament_data() -> TournamentData {
+    let tournament = default_tournament_structure();
+    TournamentData {
+        active_tournament_id: Some(tournament.id.clone()),
+        tournaments: vec![tournament],
+    }
+}
+
+#[tauri::command]
+fn get_default_tournament_structure() -> Tournament {
+    default_tournament_structure()
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TimerSettings {
@@ -330,25 +439,34 @@ fn save_timer_settings(app: tauri::AppHandle, settings: TimerSettings) -> Result
 #[tauri::command]
 fn load_tournaments(app: tauri::AppHandle) -> Result<TournamentData, String> {
     let path = tournament_file_path(&app)?;
-    if !path.exists() {
-        return Ok(TournamentData {
+    let mut data = if path.exists() {
+        let contents = fs::read_to_string(&path)
+            .map_err(|error| format!("Could not read tournament structures: {error}"))?;
+        let saved: SavedTournamentData = serde_json::from_str(&contents)
+            .map_err(|error| format!("Could not parse tournament structures: {error}"))?;
+
+        match saved {
+            SavedTournamentData::Current(data) => data,
+            SavedTournamentData::Legacy(tournaments) => TournamentData {
+                tournaments,
+                active_tournament_id: None,
+            },
+        }
+    } else {
+        TournamentData {
             tournaments: Vec::new(),
             active_tournament_id: None,
-        });
-    }
-
-    let contents = fs::read_to_string(path)
-        .map_err(|error| format!("Could not read tournament structures: {error}"))?;
-    let saved: SavedTournamentData = serde_json::from_str(&contents)
-        .map_err(|error| format!("Could not parse tournament structures: {error}"))?;
-
-    let mut data = match saved {
-        SavedTournamentData::Current(data) => data,
-        SavedTournamentData::Legacy(tournaments) => TournamentData {
-            tournaments,
-            active_tournament_id: None,
-        },
+        }
     };
+
+    let should_save = data.tournaments.is_empty();
+    if should_save {
+        data = default_tournament_data();
+        let contents = serde_json::to_string_pretty(&data)
+            .map_err(|error| format!("Could not encode default tournament structure: {error}"))?;
+        fs::write(&path, contents)
+            .map_err(|error| format!("Could not save default tournament structure: {error}"))?;
+    }
 
     if !data.tournaments.iter().any(|tournament| {
         Some(tournament.id.as_str()) == data.active_tournament_id.as_deref()
@@ -418,6 +536,7 @@ pub fn run() {
             set_keep_awake,
             get_settings_directory,
             set_settings_directory,
+            get_default_tournament_structure,
             load_tournaments,
             save_tournaments,
             load_timer_settings,
@@ -425,4 +544,78 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::default_tournament_data;
+
+    #[test]
+    fn default_tournament_data_contains_the_starter_structure() {
+        let data = default_tournament_data();
+        let tournament = &data.tournaments[0];
+
+        assert_eq!(
+            data.active_tournament_id.as_deref(),
+            Some("my-first-dinkydonk-tournament")
+        );
+        assert_eq!(tournament.name, "DinkyDonk Default Tournament");
+        assert_eq!(tournament.starting_chipstack, Some(500.0));
+        assert_eq!(tournament.buyin_cost, Some(20.0));
+        assert!(!tournament.rebuys_allowed);
+        assert!(!tournament.addons_allowed);
+        assert_eq!(tournament.percent_paid, 20.0);
+        assert_eq!(tournament.payout_model, "Standard");
+        assert_eq!(
+            tournament
+                .chips
+                .iter()
+                .map(|chip| chip.denomination)
+                .collect::<Vec<_>>(),
+            vec![1.0, 5.0, 25.0, 100.0]
+        );
+        assert_eq!(
+            tournament
+                .chips
+                .iter()
+                .map(|chip| (
+                    chip.color.as_str(),
+                    chip.text_color.as_deref(),
+                    chip.edge_spot_color.as_deref(),
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                ("#ffffff", Some("#000000"), Some("#000000")),
+                ("#ff0000", Some("#ffffff"), Some("#ffffff")),
+                ("#008000", Some("#ffffff"), Some("#ffffff")),
+                ("#000000", Some("#ffffff"), Some("#ffffff")),
+            ]
+        );
+        assert_eq!(
+            tournament
+                .levels
+                .iter()
+                .map(|level| (
+                    level.duration,
+                    level.small_blind,
+                    level.big_blind,
+                    level.ante
+                ))
+                .collect::<Vec<_>>(),
+            vec![
+                (Some(15.0), Some(2.0), Some(4.0), Some(0.0)),
+                (Some(15.0), Some(3.0), Some(6.0), Some(0.0)),
+                (Some(15.0), Some(4.0), Some(8.0), Some(0.0)),
+                (Some(15.0), Some(5.0), Some(10.0), Some(0.0)),
+                (Some(15.0), Some(10.0), Some(20.0), Some(0.0)),
+                (Some(15.0), Some(15.0), Some(30.0), Some(0.0)),
+                (Some(15.0), Some(20.0), Some(50.0), Some(0.0)),
+                (Some(15.0), Some(30.0), Some(60.0), Some(0.0)),
+                (Some(15.0), Some(40.0), Some(80.0), Some(0.0)),
+                (Some(15.0), Some(50.0), Some(100.0), Some(0.0)),
+                (Some(15.0), Some(75.0), Some(150.0), Some(0.0)),
+                (Some(15.0), Some(100.0), Some(200.0), Some(0.0)),
+            ]
+        );
+    }
 }

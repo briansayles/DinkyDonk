@@ -240,6 +240,7 @@ export default function TimerPanel({
         </div>
         <div
           className="timer-blinds-group"
+          data-tour="timer-blinds"
           title="Double-click to edit the blinds schedule"
           onDoubleClick={() => onEditSection("edit-entry-levels")}
         >
@@ -257,9 +258,39 @@ export default function TimerPanel({
           <p className="timer-blinds-label">Current Blinds</p>
         </div>
         <div className="timer-current-blinds-qr-slot">
-          <img src="/qr-code.png" alt="QR code" />
+          <button
+            className="timer-qr-fullscreen-button"
+            type="button"
+            onClick={onToggleFullscreen}
+            data-tour="timer-fullscreen"
+            aria-label={
+              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
+            }
+            aria-pressed={timerIsFullscreen}
+            title={
+              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
+            }
+          >
+            <TimerIcon
+              name={timerIsFullscreen ? "exit-timer" : "fullscreen"}
+            />
+          </button>
+          <a
+            className="timer-support-link"
+            href="https://www.buymeacoffee.com/briansayles"
+            data-tour="timer-support"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Support DinkyDonk on Buy Me a Coffee"
+            title="Buy the Developer a Coffee"
+          >
+            <img
+              src="/qr-code.png"
+              alt="Buy Me a Coffee QR code"
+            />
+          </a>
           <p className="timer-support-caption">
-            Support this program&apos;s developer
+            DinkyDonk runs on caffeine. Please consider supporting the developer.
           </p>
         </div>
       </div>
@@ -283,7 +314,11 @@ export default function TimerPanel({
           <p className="timer-next-blinds-label">Next Blinds</p>
         </div>
       )}
-      <div className="timer-left-chips" aria-label="Chips in use">
+      <div 
+        className="timer-left-chips" 
+        aria-label="Chips in use" 
+        data-tour="timer-chips"
+      >
         {timerChips.map((chip) => (
           <TimerChip
             key={chip.key}
@@ -295,6 +330,7 @@ export default function TimerPanel({
       </div>
       <div
         className="timer-clock-area"
+        data-tour="timer-clock-area"
         title="Double-click to edit the blinds schedule"
         onDoubleClick={() => onEditSection("edit-entry-levels")}
       >
@@ -373,12 +409,16 @@ export default function TimerPanel({
         )}
       </div>
       {children}
-      <div className="timer-bottom-center">
+      <div 
+        className="timer-bottom-center"
+        data-tour="timer-transport-controls"
+      >
         <div className="timer-controls">
           <button
             className="timer-control-button"
             type="button"
             onClick={onResetTimer}
+            data-tour="timer-reset"
             disabled={elapsedMs === 0 && startedAt === null}
             aria-label="Reset timer"
             title="Reset timer"
@@ -389,6 +429,7 @@ export default function TimerPanel({
             className="timer-control-button"
             type="button"
             onClick={onJumpToPreviousLevel}
+            data-tour="timer-previous-level"
             disabled={!currentLevel || currentLevel.index === 0}
             aria-label="Rewind to previous level"
             title="Rewind to previous level"
@@ -399,6 +440,7 @@ export default function TimerPanel({
             className="timer-control-button"
             type="button"
             onClick={onRestartCurrentLevel}
+            data-tour="timer-reset-level"
             disabled={!currentLevel}
             aria-label="Reset this level"
             title="Reset this level"
@@ -409,6 +451,7 @@ export default function TimerPanel({
             className="timer-toggle"
             type="button"
             onClick={onToggleTimer}
+            data-tour="timer-play-pause"
             disabled={
               totalDurationMs === 0 ||
               (startedAt === null && elapsedMs >= totalDurationMs)
@@ -422,13 +465,14 @@ export default function TimerPanel({
             className="timer-control-button"
             type="button"
             onClick={onJumpToNextLevel}
+            data-tour="timer-next-level"
             disabled={!nextLevel}
             aria-label="Jump to next level"
             title="Jump to next level"
           >
             <TimerIcon name="next" />
           </button>
-          <label className="timer-volume-control">
+          <label className="timer-volume-control" data-tour="timer-volume">
             <span>Volume</span>
             <input
               type="range"
@@ -445,22 +489,6 @@ export default function TimerPanel({
               aria-label="Timer volume"
             />
           </label>
-          <button
-            className="timer-control-button"
-            type="button"
-            onClick={onToggleFullscreen}
-            aria-label={
-              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
-            }
-            aria-pressed={timerIsFullscreen}
-            title={
-              timerIsFullscreen ? "Exit Timer" : "Enter fullscreen"
-            }
-          >
-            <TimerIcon
-              name={timerIsFullscreen ? "exit-timer" : "fullscreen"}
-            />
-          </button>
         </div>
       </div>
     </div>

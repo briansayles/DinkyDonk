@@ -42,6 +42,42 @@
   text-align: center;
 }
 
+.app-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.app-heading-logo {
+  grid-column: 1;
+  justify-self: start;
+  width: 4.875rem;
+  height: 4.875rem;
+}
+
+.app-heading-copy {
+  grid-column: 2;
+  min-width: 0;
+}
+
+.app-heading h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.app-heading-tagline {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.app-tour-button {
+  grid-column: 3;
+  justify-self: end;
+}
+
 .tab-navigation {
   display: flex;
   width: 100%;
@@ -374,6 +410,10 @@
   margin-top: 0;
 }
 
+.tab-panel:not(.timer-tab-panel) > h2 {
+  font-size: 1.75rem;
+}
+
 .tournament-manager {
   text-align: left;
 }
@@ -406,7 +446,7 @@
 .timer-current-blinds-row {
   display: grid;
   grid-area: current;
-  grid-template-columns: 7% 86% 7%;
+  grid-template-columns: minmax(3rem, 1fr) minmax(0, 12fr) minmax(3rem, 1fr);
 }
 
 .timer-blinds-group {
@@ -443,6 +483,26 @@
   width: 100%;
   max-height: 18vh;
   object-fit: contain;
+}
+
+.timer-qr-fullscreen-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.timer-qr-fullscreen-button .timer-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
+.timer-support-link {
+  display: block;
+  width: 100%;
 }
 
 .timer-support-caption {
@@ -1134,8 +1194,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.75rem;
+  height: 3.75rem;
   padding: 0;
 }
 
@@ -1905,6 +1965,31 @@
 }
 
 @media (max-width: 600px) {
+  .app-heading {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 0.5rem;
+  }
+
+  .app-heading-logo {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .app-heading-copy {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .app-heading h1 {
+    font-size: 2rem;
+  }
+
+  .app-tour-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
   .container {
     padding: 0.75rem;
   }
