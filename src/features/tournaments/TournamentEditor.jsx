@@ -1,8 +1,8 @@
 import {
   createNextLevel,
+  chipStackMatchesStarting,
   formatChipNumber,
   formatChipStackTotal,
-  getChipStackSummary,
   getChipSupportedPlayers,
   getMaxChipSupportedPlayers,
   DEFAULT_EDGE_SPOT_QUANTITY,
@@ -322,9 +322,9 @@ export default function TournamentEditor({
                           <th scope="col">Edge Spot Color</th>
                           <th scope="col">Edge Spot Quantity</th>
                           <th className="numeric-column" scope="col">Denomination</th>
-                          <th className="numeric-column" scope="col">Available</th>
                           <th className="numeric-column" scope="col">Per player</th>
                           <th className="numeric-column" scope="col">Per-player stack</th>
+                          <th className="numeric-column" scope="col">Available</th>
                           <th className="numeric-column" scope="col">Players supported</th>
                           <th scope="col">Actions</th>
                         </tr>
@@ -439,29 +439,6 @@ export default function TournamentEditor({
                                 type="number"
                                 min="0"
                                 step="1"
-                                value={chip.availableQuantity}
-                                disabled={saving}
-                                aria-label={`Chip ${index + 1} available quantity`}
-                                onChange={(event) =>
-                                  setDraft((current) => ({
-                                    ...current,
-                                    chips: current.chips.map((item, chipIndex) =>
-                                      chipIndex === index
-                                        ? {
-                                            ...item,
-                                            availableQuantity: event.target.value,
-                                          }
-                                        : item,
-                                    ),
-                                  }))
-                                }
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min="0"
-                                step="1"
                                 value={chip.quantityPerPlayer}
                                 disabled={saving}
                                 aria-label={`Chip ${index + 1} quantity per player`}
@@ -489,6 +466,29 @@ export default function TournamentEditor({
                                       Number(chip.quantityPerPlayer)
                                     ).toLocaleString()}
                               </output>
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={chip.availableQuantity}
+                                disabled={saving}
+                                aria-label={`Chip ${index + 1} available quantity`}
+                                onChange={(event) =>
+                                  setDraft((current) => ({
+                                    ...current,
+                                    chips: current.chips.map((item, chipIndex) =>
+                                      chipIndex === index
+                                        ? {
+                                            ...item,
+                                            availableQuantity: event.target.value,
+                                          }
+                                        : item,
+                                    ),
+                                  }))
+                                }
+                              />
                             </td>
                             <td>
                               <output className="chip-stack-value chip-supported-value">
@@ -522,16 +522,13 @@ export default function TournamentEditor({
                       </tbody>
                       <tfoot>
                         <tr>
-                          <th colSpan="7" scope="row">Totals</th>
+                          <th colSpan="6" scope="row">Totals</th>
                           <td className="numeric-column">
                             <output className="chip-stack-value chip-stack-total">
-                              {draft.startingChipstack !== "" &&
-                                Number.isFinite(Number(draft.startingChipstack)) &&
-                                getChipStackSummary(draft.chips).hasQuantities &&
-                                !getChipStackSummary(draft.chips)
-                                  .hasUnspecifiedQuantities &&
-                                getChipStackSummary(draft.chips).total ===
-                                  Number(draft.startingChipstack) && (
+                              {chipStackMatchesStarting(
+                                draft.chips,
+                                draft.startingChipstack,
+                              ) && (
                                   <span
                                     className="chip-stack-match"
                                     role="img"
@@ -544,6 +541,7 @@ export default function TournamentEditor({
                               {formatChipStackTotal(draft.chips)}
                             </output>
                           </td>
+                          <td />
                           <td className="numeric-column">
                             <output className="chip-stack-value chip-supported-value">
                               {getMaxChipSupportedPlayers(draft.chips) == null

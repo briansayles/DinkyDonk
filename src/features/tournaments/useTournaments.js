@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { sortChips, sortLevels } from "../../domain/tournament";
+import { sortChips, sortLevels, updateBustoutPayouts } from "../../domain/tournament";
+import { MAX_PARTICIPANT_COUNT, participantFields, resizeBustouts, resizeParticipants } from "../../domain/participants";
 
 function normalizeTournaments(tournaments) {
   return tournaments.map((tournament) => ({
@@ -35,8 +36,21 @@ export function useTournaments() {
       return;
     }
 
+    const updatedTournaments = savedTournaments.tournaments.map(updateBustoutPayouts);
+    if (updatedTournaments.some((tournament, index) => tournament !== savedTournaments.tournaments[index])) {
+      const saved = await invoke("reconcile_bustout_payouts", {
+        expectedTournaments: savedTournaments.tournaments,
+        bustoutPayouts: updatedTournaments.map((tournament) =>
+          (tournament.bustouts ?? []).map((bustout) => bustout.payout),
+        ),
+      });
+      if (!saved || savingRef.current || pendingFieldUpdatesRef.current) {
+        return;
+      }
+    }
+
     const normalizedTournaments = normalizeTournaments(
-      savedTournaments.tournaments,
+      updatedTournaments,
     );
     latestTournamentsRef.current = normalizedTournaments;
     latestActiveTournamentIdRef.current = savedTournaments.activeTournamentId;
@@ -104,6 +118,7 @@ export function useTournaments() {
     nextTournaments,
     nextActiveTournamentId = activeTournamentId,
   ) {
+    nextTournaments = nextTournaments.map(updateBustoutPayouts);
     savingRef.current = true;
     setSaving(true);
     try {
@@ -209,13 +224,24 @@ export function useTournaments() {
           Number(currentTournament.payouts?.[index] ?? 0),
         ),
       };
-    } else if (
-      field === "buyinCount" ||
-      field === "rebuyCount" ||
-      field === "addonCount" ||
-      field === "bustoutCount" ||
-      field === "maxPlayersPerTable"
-    ) {
+    } else if (Object.hasOwn(participantFields, field)) {
+      const parsedValue = Number(value);
+      if (!Number.isFinite(parsedValue) || parsedValue < 0 || !Number.isInteger(parsedValue) || parsedValue > MAX_PARTICIPANT_COUNT) {
+        setStorageError(`Participant counts must be whole numbers between 0 and ${MAX_PARTICIPANT_COUNT.toLocaleString()}.`);
+        return;
+      }
+      const arrayField = participantFields[field];
+      if (field === "bustoutCount" && parsedValue > (currentTournament.bustouts?.length ?? 0) &&
+          parsedValue > Math.max(0, (currentTournament.buyins?.length ?? 0) - 1)) {
+        setStorageError("Bustouts must leave at least one player remaining.");
+        return;
+      }
+      updatedFields = {
+        [arrayField]: field === "bustoutCount"
+          ? resizeBustouts(currentTournament, parsedValue)
+          : resizeParticipants(currentTournament[arrayField] ?? [], parsedValue),
+      };
+    } else if (field === "maxPlayersPerTable") {
       const parsedValue = Number(value);
       updatedFields = {
         [field]: Number.isFinite(parsedValue)
@@ -233,7 +259,7 @@ export function useTournaments() {
 
     const nextTournaments = latestTournamentsRef.current.map((tournament) =>
       tournament.id === tournamentId
-        ? { ...tournament, ...updatedFields }
+        ? updateBustoutPayouts({ ...tournament, ...updatedFields })
         : tournament,
     );
     latestTournamentsRef.current = nextTournaments;
@@ -293,12 +319,12 @@ export function useTournaments() {
       addonCost: source.addonCost ?? null,
       addonChipstack: source.addonChipstack ?? null,
       addonDescription: source.addonDescription ?? null,
-      buyinCount: 0,
-      rebuyCount: 0,
-      addonCount: 0,
+      buyins: [],
+      rebuys: [],
+      addons: [],
       otherPrizePool: 0,
       otherChipstack: 0,
-      bustoutCount: 0,
+      bustouts: [],
       payoutPlaces: 0,
       payouts: [],
       maxPlayersPerTable: source.maxPlayersPerTable ?? 0,
@@ -335,12 +361,23 @@ export function useTournaments() {
     }
 
     const parsedCount = Number(value);
-    const count = Number.isFinite(parsedCount)
-      ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedCount)))
-      : 0;
+    if (!Object.hasOwn(participantFields, field) || !Number.isInteger(parsedCount) || parsedCount < 0 || parsedCount > MAX_PARTICIPANT_COUNT) {
+      setStorageError(`Participant counts must be whole numbers between 0 and ${MAX_PARTICIPANT_COUNT.toLocaleString()}.`);
+      return;
+    }
+    const arrayField = participantFields[field];
+    const tournament = tournaments.find((item) => item.id === tournamentId);
+    if (field === "bustoutCount" && tournament &&
+        parsedCount > (tournament.bustouts?.length ?? 0) &&
+        parsedCount > Math.max(0, (tournament.buyins?.length ?? 0) - 1)) {
+      setStorageError("Bustouts must leave at least one player remaining.");
+      return;
+    }
     const nextTournaments = tournaments.map((tournament) =>
       tournament.id === tournamentId
-        ? { ...tournament, [field]: count }
+        ? { ...tournament, [arrayField]: field === "bustoutCount"
+          ? resizeBustouts(tournament, parsedCount)
+          : resizeParticipants(tournament[arrayField] ?? [], parsedCount) }
         : tournament,
     );
     if (await persistTournamentData(nextTournaments)) {
@@ -449,15 +486,16 @@ export function useTournaments() {
       return;
     }
 
+    await flushTournamentFieldUpdates();
     const resetFields = {
-      buyinCount: 0,
-      rebuyCount: 0,
-      addonCount: 0,
+      buyins: [],
+      rebuys: [],
+      addons: [],
       otherPrizePool: 0,
       otherChipstack: 0,
-      bustoutCount: 0,
+      bustouts: [],
     };
-    const nextTournaments = tournaments.map((tournament) =>
+    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
       tournament.id === activeTournament.id
         ? { ...tournament, ...resetFields }
         : tournament,
@@ -476,7 +514,19 @@ export function useTournaments() {
       return;
     }
 
-    await updateEntryCount(activeTournament.id, "bustoutCount", "0");
+    await flushTournamentFieldUpdates();
+    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
+      tournament.id === activeTournament.id
+        ? { ...tournament, bustouts: [] }
+        : tournament,
+    );
+    if (await persistTournamentData(nextTournaments, latestActiveTournamentIdRef.current)) {
+      setEntryCountDrafts((drafts) => {
+        const nextDrafts = { ...drafts[activeTournament.id] };
+        delete nextDrafts.bustoutCount;
+        return { ...drafts, [activeTournament.id]: nextDrafts };
+      });
+    }
   }
 
   async function resetPayouts(activeTournament) {

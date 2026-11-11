@@ -1,8 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{self, Sender};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{
+    Mutex,
+    mpsc::{self, Sender},
+};
 use tauri::{Manager, State};
+
+const DEFAULT_TOURNAMENT_ID: &str = "3bd8977a-a9fb-4b68-a2fb-f4cc8cb199d2";
+const LEGACY_DEFAULT_TOURNAMENT_ID: &str = "my-first-dinkydonk-tournament";
+
+#[derive(Default)]
+struct PersistenceLock(Mutex<()>);
 
 struct KeepAwakeRequest {
     enabled: bool,
@@ -95,6 +105,38 @@ struct TournamentChip {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct TournamentParticipant {
+    name: String,
+    timestamp: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BustoutBlinds {
+    small_blind: Option<f64>,
+    big_blind: Option<f64>,
+    ante: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TournamentBustout {
+    name: String,
+    timestamp: u64,
+    #[serde(default)]
+    blinds: Option<BustoutBlinds>,
+    #[serde(default)]
+    elapsed_seconds: Option<u64>,
+    #[serde(default)]
+    place: Option<u32>,
+    #[serde(default)]
+    points_earned: Option<f64>,
+    #[serde(default)]
+    payout: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Tournament {
     id: String,
     name: String,
@@ -121,17 +163,19 @@ struct Tournament {
     #[serde(default)]
     addon_description: Option<String>,
     #[serde(default)]
-    buyin_count: u32,
+    buyins: Vec<TournamentParticipant>,
     #[serde(default)]
-    rebuy_count: u32,
+    rebuys: Vec<TournamentParticipant>,
     #[serde(default)]
-    addon_count: u32,
+    addons: Vec<TournamentParticipant>,
     #[serde(default)]
     other_prize_pool: f64,
     #[serde(default)]
     other_chipstack: f64,
     #[serde(default)]
-    bustout_count: u32,
+    bustouts: Vec<TournamentBustout>,
+    #[serde(default = "default_bustouts_newest_first")]
+    bustouts_newest_first: bool,
     #[serde(default)]
     payout_places: u32,
     #[serde(default)]
@@ -159,6 +203,10 @@ fn default_percent_paid() -> f64 {
     20.0
 }
 
+fn default_bustouts_newest_first() -> bool {
+    true
+}
+
 fn default_payout_model() -> String {
     "Standard".to_string()
 }
@@ -172,6 +220,17 @@ fn default_allow_payout_override() -> bool {
 struct TournamentData {
     tournaments: Vec<Tournament>,
     active_tournament_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct AppData {
+    #[serde(default)]
+    tournaments: Vec<Tournament>,
+    #[serde(default)]
+    active_tournament_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    timer_settings: Option<TimerSettings>,
 }
 
 fn default_tournament_structure() -> Tournament {
@@ -237,7 +296,7 @@ fn default_tournament_structure() -> Tournament {
         },
     ];
     Tournament {
-        id: "my-first-dinkydonk-tournament".to_string(),
+        id: DEFAULT_TOURNAMENT_ID.to_string(),
         name: "DinkyDonk Default Tournament".to_string(),
         starting_chipstack: Some(500.0),
         rebuys_allowed: false,
@@ -250,12 +309,13 @@ fn default_tournament_structure() -> Tournament {
         addon_cost: None,
         addon_chipstack: None,
         addon_description: None,
-        buyin_count: 0,
-        rebuy_count: 0,
-        addon_count: 0,
+        buyins: Vec::new(),
+        rebuys: Vec::new(),
+        addons: Vec::new(),
         other_prize_pool: 0.0,
         other_chipstack: 0.0,
-        bustout_count: 0,
+        bustouts: Vec::new(),
+        bustouts_newest_first: true,
         payout_places: 0,
         payouts: Vec::new(),
         percent_paid: default_percent_paid(),
@@ -318,13 +378,6 @@ fn default_countdown_warning_announcement() -> String {
     "{seconds} seconds remaining.".to_string()
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum SavedTournamentData {
-    Current(TournamentData),
-    Legacy(Vec<Tournament>),
-}
-
 fn default_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let data_dir = app
         .path()
@@ -362,32 +415,182 @@ fn configured_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn tournament_file_path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    Ok(configured_data_dir(app)?.join("tournament-structures.json"))
+fn app_data_file_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("DinkyDonk.JSON")
 }
 
-fn timer_settings_file_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(configured_data_dir(app)?.join("timer-settings.json"))
-}
-
-fn copy_if_missing(source_dir: &Path, target_dir: &Path, file_name: &str) -> Result<(), String> {
-    let source = source_dir.join(file_name);
-    let target = target_dir.join(file_name);
-    if source.exists() && !target.exists() {
-        fs::copy(source, target).map_err(|error| {
-            format!("Could not copy {file_name} to the selected directory: {error}")
-        })?;
+fn read_app_data_from_dir(data_dir: &Path) -> Result<AppData, String> {
+    let path = app_data_file_path(data_dir);
+    if !path.exists() {
+        return Ok(AppData::default());
     }
-    Ok(())
+
+    let contents = fs::read_to_string(&path)
+        .map_err(|error| format!("Could not read DinkyDonk.JSON: {error}"))?;
+    let mut json: serde_json::Value = serde_json::from_str(&contents)
+        .map_err(|error| format!("Could not parse DinkyDonk.JSON: {error}"))?;
+    let mut migrated = migrate_legacy_counts(&mut json)?;
+    migrated |= migrate_bustout_order(&mut json)?;
+    migrated |= add_missing_bustout_payouts(&mut json);
+    let data = AppData::deserialize(&json)
+        .map_err(|error| format!("Could not parse DinkyDonk.JSON: {error}"))?;
+    if migrated {
+        let contents = serde_json::to_string_pretty(&json)
+            .map_err(|error| format!("Could not encode DinkyDonk.JSON: {error}"))?;
+        fs::write(path, contents)
+            .map_err(|error| format!("Could not save migrated DinkyDonk.JSON: {error}"))?;
+    }
+    Ok(data)
+}
+
+fn add_missing_bustout_payouts(data: &mut serde_json::Value) -> bool {
+    let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
+        return false;
+    };
+    let mut changed = false;
+    for tournament in tournaments {
+        if let Some(bustouts) = tournament.get_mut("bustouts").and_then(|value| value.as_array_mut()) {
+            for bustout in bustouts {
+                if let Some(fields) = bustout.as_object_mut() {
+                    if !fields.contains_key("payout") {
+                        fields.insert("payout".to_string(), serde_json::Value::Null);
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+    changed
+}
+
+fn migrate_bustout_order(data: &mut serde_json::Value) -> Result<bool, String> {
+    let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
+        return Ok(false);
+    };
+    let mut changed = false;
+    for tournament in tournaments {
+        let Some(fields) = tournament.as_object_mut() else {
+            continue;
+        };
+        match fields.get("bustoutsNewestFirst") {
+            Some(serde_json::Value::Bool(true)) => continue,
+            Some(serde_json::Value::Bool(false)) | None => {}
+            Some(_) => return Err("Invalid bustoutsNewestFirst in DinkyDonk.JSON".to_string()),
+        }
+        if let Some(bustouts) = fields.get_mut("bustouts") {
+            bustouts.as_array_mut()
+                .ok_or("Invalid bustouts in DinkyDonk.JSON")?
+                .reverse();
+        }
+        fields.insert("bustoutsNewestFirst".to_string(), serde_json::Value::Bool(true));
+        changed = true;
+    }
+    Ok(changed)
+}
+
+fn migrate_legacy_counts(data: &mut serde_json::Value) -> Result<bool, String> {
+    let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
+        return Ok(false);
+    };
+    let mut changed = false;
+    let mut timestamp = None;
+    for tournament in tournaments {
+        let Some(fields) = tournament.as_object_mut() else {
+            continue;
+        };
+        for (old, new) in [
+            ("buyinCount", "buyins"),
+            ("rebuyCount", "rebuys"),
+            ("addonCount", "addons"),
+            ("bustoutCount", "bustouts"),
+        ] {
+            if let Some(count) = fields.remove(old) {
+                changed = true;
+                let count = count.as_u64()
+                    .filter(|count| *count <= u32::MAX as u64)
+                    .ok_or_else(|| format!("Invalid legacy {old} in DinkyDonk.JSON"))?;
+                if !fields.contains_key(new) {
+                    if count > 100_000 {
+                        return Err(format!("Cannot migrate {old}: count exceeds 100,000"));
+                    }
+                    let timestamp = match timestamp {
+                        Some(timestamp) => timestamp,
+                        None => {
+                            let now = SystemTime::now().duration_since(UNIX_EPOCH)
+                                .map_err(|error| format!("Could not timestamp legacy entries: {error}"))?
+                                .as_millis() as u64;
+                            timestamp = Some(now);
+                            now
+                        }
+                    };
+                    let mut records = Vec::new();
+                    records.try_reserve(count as usize)
+                        .map_err(|error| format!("Could not migrate {old}: {error}"))?;
+                    for _ in 0..count {
+                        records.push(serde_json::json!({ "name": "Unnamed", "timestamp": timestamp }));
+                    }
+                    fields.insert(new.to_string(), serde_json::Value::Array(records));
+                }
+            }
+        }
+    }
+    Ok(changed)
+}
+
+fn write_app_data_to_dir(data_dir: &Path, data: &AppData) -> Result<(), String> {
+    let contents = serde_json::to_string_pretty(data)
+        .map_err(|error| format!("Could not encode DinkyDonk.JSON: {error}"))?;
+    fs::write(app_data_file_path(data_dir), contents)
+        .map_err(|error| format!("Could not save DinkyDonk.JSON: {error}"))
+}
+
+fn read_app_data(app: &tauri::AppHandle) -> Result<AppData, String> {
+    read_app_data_from_dir(&configured_data_dir(app)?)
+}
+
+fn write_app_data(app: &tauri::AppHandle, data: &AppData) -> Result<(), String> {
+    write_app_data_to_dir(&configured_data_dir(app)?, data)
+}
+
+fn migrate_legacy_default_tournament_id(data: &mut AppData) -> bool {
+    let mut changed = false;
+    for tournament in &mut data.tournaments {
+        if tournament.id == LEGACY_DEFAULT_TOURNAMENT_ID {
+            tournament.id = DEFAULT_TOURNAMENT_ID.to_string();
+            changed = true;
+        }
+    }
+
+    if data.active_tournament_id.as_deref() == Some(LEGACY_DEFAULT_TOURNAMENT_ID) {
+        data.active_tournament_id = Some(DEFAULT_TOURNAMENT_ID.to_string());
+        changed = true;
+    }
+
+    changed
 }
 
 #[tauri::command]
-fn get_settings_directory(app: tauri::AppHandle) -> Result<String, String> {
+fn get_settings_directory(
+    app: tauri::AppHandle,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<String, String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
     Ok(configured_data_dir(&app)?.to_string_lossy().into_owned())
 }
 
 #[tauri::command(rename_all = "camelCase")]
-fn set_settings_directory(app: tauri::AppHandle, path: String) -> Result<String, String> {
+fn set_settings_directory(
+    app: tauri::AppHandle,
+    path: String,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<String, String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
     let selected_dir = PathBuf::from(path);
     if !selected_dir.is_dir() {
         return Err("The selected settings directory does not exist.".to_string());
@@ -402,8 +605,12 @@ fn set_settings_directory(app: tauri::AppHandle, path: String) -> Result<String,
         .map_err(|error| format!("Could not resolve the current settings directory: {error}"))?;
 
     if selected_dir != current_dir {
-        copy_if_missing(&current_dir, &selected_dir, "tournament-structures.json")?;
-        copy_if_missing(&current_dir, &selected_dir, "timer-settings.json")?;
+        let current_file = app_data_file_path(&current_dir);
+        let selected_file = app_data_file_path(&selected_dir);
+        if current_file.exists() && !selected_file.exists() {
+            fs::copy(&current_file, &selected_file)
+                .map_err(|error| format!("Could not copy DinkyDonk.JSON: {error}"))?;
+        }
         let config_path = settings_directory_config_path(&app)?;
         let contents = serde_json::to_string(&selected_dir.to_string_lossy().as_ref())
             .map_err(|error| format!("Could not encode settings directory: {error}"))?;
@@ -415,66 +622,72 @@ fn set_settings_directory(app: tauri::AppHandle, path: String) -> Result<String,
 }
 
 #[tauri::command]
-fn load_timer_settings(app: tauri::AppHandle) -> Result<Option<TimerSettings>, String> {
-    let path = timer_settings_file_path(&app)?;
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    let contents = fs::read_to_string(path)
-        .map_err(|error| format!("Could not read timer settings: {error}"))?;
-    serde_json::from_str(&contents)
-        .map(Some)
-        .map_err(|error| format!("Could not parse timer settings: {error}"))
+fn load_timer_settings(
+    app: tauri::AppHandle,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<Option<TimerSettings>, String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
+    Ok(read_app_data(&app)?.timer_settings)
 }
 
 #[tauri::command]
-fn save_timer_settings(app: tauri::AppHandle, settings: TimerSettings) -> Result<(), String> {
-    let contents = serde_json::to_string_pretty(&settings)
-        .map_err(|error| format!("Could not encode timer settings: {error}"))?;
-    fs::write(timer_settings_file_path(&app)?, contents)
-        .map_err(|error| format!("Could not save timer settings: {error}"))
+fn save_timer_settings(
+    app: tauri::AppHandle,
+    settings: TimerSettings,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<(), String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
+    let mut data = read_app_data(&app)?;
+    data.timer_settings = Some(settings);
+    write_app_data(&app, &data)
 }
 
 #[tauri::command]
-fn load_tournaments(app: tauri::AppHandle) -> Result<TournamentData, String> {
-    let path = tournament_file_path(&app)?;
-    let mut data = if path.exists() {
-        let contents = fs::read_to_string(&path)
-            .map_err(|error| format!("Could not read tournament structures: {error}"))?;
-        let saved: SavedTournamentData = serde_json::from_str(&contents)
-            .map_err(|error| format!("Could not parse tournament structures: {error}"))?;
+fn load_tournaments(
+    app: tauri::AppHandle,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<TournamentData, String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
+    let mut data = read_app_data(&app)?;
+    let mut changed = false;
 
-        match saved {
-            SavedTournamentData::Current(data) => data,
-            SavedTournamentData::Legacy(tournaments) => TournamentData {
-                tournaments,
-                active_tournament_id: None,
-            },
-        }
-    } else {
-        TournamentData {
-            tournaments: Vec::new(),
-            active_tournament_id: None,
-        }
-    };
-
-    let should_save = data.tournaments.is_empty();
-    if should_save {
-        data = default_tournament_data();
-        let contents = serde_json::to_string_pretty(&data)
-            .map_err(|error| format!("Could not encode default tournament structure: {error}"))?;
-        fs::write(&path, contents)
-            .map_err(|error| format!("Could not save default tournament structure: {error}"))?;
+    if data.tournaments.is_empty() {
+        let defaults = default_tournament_data();
+        data.tournaments = defaults.tournaments;
+        data.active_tournament_id = defaults.active_tournament_id;
+        changed = true;
     }
 
-    if !data.tournaments.iter().any(|tournament| {
-        Some(tournament.id.as_str()) == data.active_tournament_id.as_deref()
-    }) {
-        data.active_tournament_id = None;
+    changed |= migrate_legacy_default_tournament_id(&mut data);
+
+    if let Some(active_tournament_id) = data.active_tournament_id.as_deref() {
+        if !data
+            .tournaments
+            .iter()
+            .any(|tournament| tournament.id == active_tournament_id)
+        {
+            data.active_tournament_id = None;
+            changed = true;
+        }
     }
 
-    Ok(data)
+    if changed {
+        write_app_data(&app, &data)?;
+    }
+
+    Ok(TournamentData {
+        tournaments: data.tournaments,
+        active_tournament_id: data.active_tournament_id,
+    })
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -482,19 +695,66 @@ fn save_tournaments(
     app: tauri::AppHandle,
     tournaments: Vec<Tournament>,
     active_tournament_id: Option<String>,
+    persistence: State<'_, PersistenceLock>,
 ) -> Result<(), String> {
-    let path = tournament_file_path(&app)?;
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
     let active_tournament_id = active_tournament_id.filter(|active_id| {
         tournaments.iter().any(|tournament| tournament.id == *active_id)
     });
-    let data = TournamentData {
-        tournaments,
-        active_tournament_id,
-    };
-    let contents = serde_json::to_string_pretty(&data)
-        .map_err(|error| format!("Could not encode tournament structures: {error}"))?;
-    fs::write(path, contents)
-        .map_err(|error| format!("Could not save tournament structures: {error}"))
+    let mut data = read_app_data(&app)?;
+    data.tournaments = tournaments;
+    data.active_tournament_id = active_tournament_id;
+    write_app_data(&app, &data)
+}
+
+fn apply_bustout_payouts(
+    data: &mut AppData,
+    expected_tournaments: &[Tournament],
+    bustout_payouts: &[Vec<Option<f64>>],
+) -> Result<bool, String> {
+    if bustout_payouts.len() != expected_tournaments.len()
+        || expected_tournaments.iter().zip(bustout_payouts).any(|(tournament, payouts)| {
+            tournament.bustouts.len() != payouts.len()
+                || payouts.iter().flatten().any(|payout| !payout.is_finite())
+        })
+    {
+        return Err("Invalid bustout payouts.".to_string());
+    }
+    let current = serde_json::to_value(&data.tournaments)
+        .map_err(|error| format!("Could not compare tournament data: {error}"))?;
+    let expected = serde_json::to_value(expected_tournaments)
+        .map_err(|error| format!("Could not compare tournament data: {error}"))?;
+    if current != expected {
+        return Ok(false);
+    }
+    for (tournament, payouts) in data.tournaments.iter_mut().zip(bustout_payouts) {
+        for (bustout, payout) in tournament.bustouts.iter_mut().zip(payouts) {
+            bustout.payout = *payout;
+        }
+    }
+    Ok(true)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn reconcile_bustout_payouts(
+    app: tauri::AppHandle,
+    expected_tournaments: Vec<Tournament>,
+    bustout_payouts: Vec<Vec<Option<f64>>>,
+    persistence: State<'_, PersistenceLock>,
+) -> Result<bool, String> {
+    let _guard = persistence
+        .0
+        .lock()
+        .map_err(|error| format!("Could not lock app data: {error}"))?;
+    let mut data = read_app_data(&app)?;
+    if !apply_bustout_payouts(&mut data, &expected_tournaments, &bustout_payouts)? {
+        return Ok(false);
+    }
+    write_app_data(&app, &data)?;
+    Ok(true)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -502,6 +762,7 @@ pub fn run() {
     let (keep_awake_sender, keep_awake_receiver) = mpsc::channel::<KeepAwakeRequest>();
 
     tauri::Builder::default()
+        .manage(PersistenceLock::default())
         .manage(KeepAwakeController {
             sender: keep_awake_sender,
         })
@@ -539,6 +800,7 @@ pub fn run() {
             get_default_tournament_structure,
             load_tournaments,
             save_tournaments,
+            reconcile_bustout_payouts,
             load_timer_settings,
             save_timer_settings
         ])
@@ -548,7 +810,204 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::default_tournament_data;
+    use super::{
+        AppData, DEFAULT_TOURNAMENT_ID, LEGACY_DEFAULT_TOURNAMENT_ID, TimerSettings,
+        default_tournament_data, migrate_legacy_default_tournament_id,
+    };
+
+    #[test]
+    fn legacy_counts_migrate_to_timestamped_arrays_once() {
+        let mut data = serde_json::json!({
+            "tournaments": [{
+                "buyinCount": 2, "rebuyCount": 1, "addonCount": 0, "bustoutCount": 1
+            }]
+        });
+        assert!(super::migrate_legacy_counts(&mut data).unwrap());
+        let tournament = &data["tournaments"][0];
+        for (field, count) in [("buyins", 2), ("rebuys", 1), ("addons", 0), ("bustouts", 1)] {
+            let records = tournament[field].as_array().unwrap();
+            assert_eq!(records.len(), count);
+            for record in records {
+                assert_eq!(record["name"], "Unnamed");
+                assert!(record["timestamp"].as_u64().unwrap() > 0);
+            }
+        }
+        assert!(tournament.get("buyinCount").is_none());
+        let migrated = data.clone();
+        assert!(!super::migrate_legacy_counts(&mut data).unwrap());
+        assert_eq!(data, migrated);
+    }
+
+    #[test]
+    fn existing_arrays_take_precedence_and_invalid_legacy_counts_fail() {
+        let mut data = serde_json::json!({
+            "tournaments": [{ "buyinCount": 5, "buyins": [{ "name": "A", "timestamp": 1 }] }]
+        });
+        assert!(super::migrate_legacy_counts(&mut data).unwrap());
+        assert_eq!(data["tournaments"][0]["buyins"].as_array().unwrap().len(), 1);
+        let mut invalid = serde_json::json!({ "tournaments": [{ "buyinCount": -1 }] });
+        assert!(super::migrate_legacy_counts(&mut invalid).is_err());
+    }
+
+    #[test]
+    fn bustout_details_round_trip_and_old_records_load() {
+        let json = serde_json::json!({
+            "name": "Unnamed",
+            "timestamp": 12345,
+            "blinds": { "smallBlind": 50.0, "bigBlind": 100.0, "ante": 10.0 },
+            "elapsedSeconds": 90,
+            "place": 4,
+            "pointsEarned": null,
+            "payout": 35.0
+        });
+        let bustout: super::TournamentBustout = serde_json::from_value(json.clone()).unwrap();
+        assert_eq!(serde_json::to_value(bustout).unwrap(), json);
+
+        let old: super::TournamentBustout = serde_json::from_value(serde_json::json!({
+            "name": "Unnamed", "timestamp": 100
+        })).unwrap();
+        let saved = serde_json::to_value(old).unwrap();
+        assert!(saved["blinds"].is_null());
+        assert!(saved["elapsedSeconds"].is_null());
+        assert!(saved["place"].is_null());
+        assert!(saved["pointsEarned"].is_null());
+        assert!(saved["payout"].is_null());
+    }
+
+    #[test]
+    fn payout_reconciliation_checks_saved_data_before_updating() {
+        let mut data = AppData {
+            tournaments: vec![super::default_tournament_structure()],
+            active_tournament_id: Some(DEFAULT_TOURNAMENT_ID.to_string()),
+            timer_settings: None,
+        };
+        data.tournaments[0].bustouts.push(serde_json::from_value(serde_json::json!({
+            "name": "Unnamed", "timestamp": 1, "place": 2
+        })).unwrap());
+        let expected: Vec<super::Tournament> = serde_json::from_value(
+            serde_json::to_value(&data.tournaments).unwrap()
+        ).unwrap();
+        assert!(super::apply_bustout_payouts(&mut data, &expected, &[vec![Some(25.0)]]).unwrap());
+        assert_eq!(data.tournaments[0].bustouts[0].payout, Some(25.0));
+        assert!(!super::apply_bustout_payouts(&mut data, &expected, &[vec![Some(50.0)]]).unwrap());
+        assert_eq!(data.tournaments[0].bustouts[0].payout, Some(25.0));
+        assert!(super::apply_bustout_payouts(&mut data, &expected, &[vec![]]).is_err());
+    }
+
+    #[test]
+    fn legacy_bustout_order_is_reversed_only_once() {
+        let mut data = serde_json::json!({
+            "tournaments": [
+                { "bustouts": [
+                    { "name": "First", "timestamp": 1, "place": 5 },
+                    { "name": "Second", "timestamp": 2, "place": 4 }
+                ] },
+                { "bustoutsNewestFirst": true, "bustouts": [
+                    { "name": "Newest", "timestamp": 4 },
+                    { "name": "Older", "timestamp": 3 }
+                ] }
+            ]
+        });
+        assert!(super::migrate_bustout_order(&mut data).unwrap());
+        assert_eq!(data["tournaments"][0]["bustouts"][0]["name"], "Second");
+        assert_eq!(data["tournaments"][0]["bustouts"][1]["place"], 5);
+        assert_eq!(data["tournaments"][1]["bustouts"][0]["name"], "Newest");
+        let migrated = data.clone();
+        assert!(!super::migrate_bustout_order(&mut data).unwrap());
+        assert_eq!(data, migrated);
+    }
+
+    #[test]
+    fn loading_legacy_counts_persists_migration_and_timestamps() {
+        let directory = std::env::temp_dir().join(format!(
+            "dinkydonk-migration-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let mut json = serde_json::to_value(super::default_tournament_data()).unwrap();
+        json["futureSetting"] = serde_json::json!("preserved");
+        let tournament = json["tournaments"][0].as_object_mut().unwrap();
+        tournament.remove("buyins");
+        tournament.remove("bustoutsNewestFirst");
+        tournament.insert("buyinCount".to_string(), serde_json::json!(2));
+        tournament.insert("bustouts".to_string(), serde_json::json!([
+            { "name": "First", "timestamp": 1 },
+            { "name": "Second", "timestamp": 2 }
+        ]));
+        let path = super::app_data_file_path(&directory);
+        std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+
+        let first = super::read_app_data_from_dir(&directory).unwrap();
+        assert_eq!(first.tournaments[0].buyins.len(), 2);
+        let timestamp = first.tournaments[0].buyins[0].timestamp;
+        let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(saved["tournaments"][0].get("buyinCount").is_none());
+        assert_eq!(saved["futureSetting"], "preserved");
+        assert_eq!(saved["tournaments"][0]["bustoutsNewestFirst"], true);
+        assert_eq!(saved["tournaments"][0]["bustouts"][0]["name"], "Second");
+        assert!(saved["tournaments"][0]["bustouts"][0].get("payout").unwrap().is_null());
+        assert_eq!(saved["tournaments"][0]["buyins"][0]["timestamp"], timestamp);
+        let second = super::read_app_data_from_dir(&directory).unwrap();
+        assert_eq!(second.tournaments[0].buyins[0].timestamp, timestamp);
+        assert_eq!(second.tournaments[0].bustouts[0].name, "Second");
+
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn legacy_default_tournament_id_is_replaced_with_a_guid() {
+        let mut data = AppData {
+            tournaments: vec![super::default_tournament_structure()],
+            active_tournament_id: Some(LEGACY_DEFAULT_TOURNAMENT_ID.to_string()),
+            timer_settings: None,
+        };
+        data.tournaments[0].id = LEGACY_DEFAULT_TOURNAMENT_ID.to_string();
+
+        assert!(migrate_legacy_default_tournament_id(&mut data));
+        assert_eq!(data.tournaments[0].id, DEFAULT_TOURNAMENT_ID);
+        assert_eq!(
+            data.active_tournament_id.as_deref(),
+            Some(DEFAULT_TOURNAMENT_ID)
+        );
+    }
+
+    #[test]
+    fn app_data_round_trips_tournament_and_timer_settings_together() {
+        let tournament_data = default_tournament_data();
+        let data = AppData {
+            tournaments: tournament_data.tournaments,
+            active_tournament_id: tournament_data.active_tournament_id,
+            timer_settings: Some(TimerSettings {
+                alarm_sound: "triple-ding".to_string(),
+                volume: 0.5,
+                spoken_announcement_enabled: true,
+                announcement_speed: 1.0,
+                announcement: "Level changed.".to_string(),
+                countdown_warning_seconds: 10,
+                countdown_warning_sound: "single-ding".to_string(),
+                countdown_warning_speech_enabled: false,
+                countdown_warning_announcement: "{seconds} seconds remaining.".to_string(),
+            }),
+        };
+
+        let json = serde_json::to_value(&data).unwrap();
+        assert!(json["tournaments"].is_array());
+        assert!(json["timerSettings"].is_object());
+        assert_eq!(
+            json["activeTournamentId"],
+            DEFAULT_TOURNAMENT_ID
+        );
+
+        let loaded: AppData = serde_json::from_value(json).unwrap();
+        assert_eq!(loaded.tournaments.len(), 1);
+        assert_eq!(
+            loaded.active_tournament_id.as_deref(),
+            Some(DEFAULT_TOURNAMENT_ID)
+        );
+        assert_eq!(loaded.timer_settings.unwrap().volume, 0.5);
+    }
 
     #[test]
     fn default_tournament_data_contains_the_starter_structure() {
@@ -557,7 +1016,7 @@ mod tests {
 
         assert_eq!(
             data.active_tournament_id.as_deref(),
-            Some("my-first-dinkydonk-tournament")
+            Some(DEFAULT_TOURNAMENT_ID)
         );
         assert_eq!(tournament.name, "DinkyDonk Default Tournament");
         assert_eq!(tournament.starting_chipstack, Some(500.0));

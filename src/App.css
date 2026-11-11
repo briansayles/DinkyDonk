@@ -78,6 +78,99 @@
   justify-self: end;
 }
 
+.app-splash {
+  position: fixed;
+  z-index: 20000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(35, 101, 66, 0.9), transparent 55%),
+    #0b2117;
+  color: #f7f1df;
+  opacity: 1;
+  transition: opacity 450ms ease;
+}
+
+.app-splash-exiting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-splash-content {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  animation: app-splash-appear 700ms ease-out both;
+}
+
+.app-splash-logo {
+  display: block;
+  width: min(42vw, 18rem);
+  aspect-ratio: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 0.75rem 1.5rem rgba(0, 0, 0, 0.35));
+}
+
+.app-splash-content h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.1;
+}
+
+.app-splash-content p {
+  margin: 0;
+  color: #d7d0bc;
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+}
+
+.app-splash-loader {
+  width: min(12rem, 55vw);
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  margin-top: 0.75rem;
+  background: rgba(247, 241, 223, 0.2);
+}
+
+.app-splash-loader span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: #d7a928;
+  animation: app-splash-loading 1.2s ease-in-out infinite;
+}
+
+.app-splash-status {
+  color: #d7d0bc;
+  font-size: 0.85rem;
+}
+
+@keyframes app-splash-appear {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes app-splash-loading {
+  from {
+    transform: translateX(-120%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
 .tab-navigation {
   display: flex;
   width: 100%;
@@ -161,17 +254,6 @@
 .timer-tab-panel-active .timer-blinds-group,
 .timer-tab-panel-active .timer-next-blinds-group,
 .timer-tab-panel-active .timer-clock,
-.timer-tab-panel-active .timer-clock-value,
-.timer-tab-panel-active .timer-blinds-value,
-.timer-tab-panel-active .timer-next-blinds-value,
-.timer-tab-panel-active .timer-blinds-value-entering-up,
-.timer-tab-panel-active .timer-blinds-value-entering-down,
-.timer-tab-panel-active .timer-blinds-value-leaving-up,
-.timer-tab-panel-active .timer-blinds-value-leaving-down,
-.timer-tab-panel-active .timer-next-blinds-value-entering-up,
-.timer-tab-panel-active .timer-next-blinds-value-entering-down,
-.timer-tab-panel-active .timer-next-blinds-value-leaving-up,
-.timer-tab-panel-active .timer-next-blinds-value-leaving-down,
 .timer-tab-panel-active .timer-message,
 .timer-tab-panel-active .timer-entry-heading h3,
 .timer-tab-panel-active .timer-entry-table thead th,
@@ -366,6 +448,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .app-splash {
+    transition: none;
+  }
+
+  .app-splash-content,
+  .app-splash-loader span {
+    animation: none;
+  }
+
   .timer-tab-panel-active {
     --timer-complementary-text-color: #fff;
     animation: none;
@@ -456,6 +547,10 @@
   row-gap: clamp(0.15rem, 0.75vh, 0.5rem);
   padding: clamp(0.25rem, 0.75vh, 0.75rem) 0.5rem;
   text-align: center;
+}
+
+.timer-display:has(.timer-blinds-value-leaving-down) {
+  overflow: clip;
 }
 
 .timer-current-blinds-row {
@@ -1074,10 +1169,6 @@
   display: inline-block;
 }
 
-.timer-clock-value {
-  animation: timer-value-change 180ms ease-out both;
-}
-
 .timer-blinds-value-entering-up,
 .timer-next-blinds-value-entering-up {
   animation: timer-blinds-drift-in-up 800ms
@@ -1120,18 +1211,6 @@
 .timer-next-blinds-value-leaving-down {
   animation: timer-next-blinds-drift-down 800ms
     cubic-bezier(0.2, 0.75, 0.25, 1) both;
-}
-
-@keyframes timer-value-change {
-  from {
-    opacity: 0.55;
-    transform: translateY(0.08em);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 @keyframes timer-blinds-drift-in-up {

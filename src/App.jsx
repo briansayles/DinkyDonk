@@ -3,15 +3,16 @@ import { Joyride, STATUS } from "react-joyride";
 import { invoke } from "@tauri-apps/api/core";
 import {
   createNextLevel,
-  calculateDefaultPayouts,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
   DEFAULT_PAYOUT_MODEL,
   DEFAULT_PERCENT_PAID,
   formatCurrency,
+  getEffectivePayouts,
   normalizeEdgeSpotQuantity,
   sortChips,
   sortLevels,
 } from "./domain/tournament";
+import { MAX_PARTICIPANT_COUNT, participantFields, previewParticipantCount } from "./domain/participants";
 import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
 import { useTournaments } from "./features/tournaments/useTournaments";
@@ -62,6 +63,10 @@ function createTournamentDraft(tournament) {
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
   const [runUserTour, setRunUserTour] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashExiting, setSplashExiting] = useState(false);
+  const [minimumSplashTimeElapsed, setMinimumSplashTimeElapsed] =
+    useState(false);
   const [editingId, setEditingId] = useState(null);
   const [creatingStructure, setCreatingStructure] = useState(false);
   const [structureCreationError, setStructureCreationError] = useState("");
@@ -112,6 +117,27 @@ function App() {
     timerSettingsError,
     timerSettingsLoaded,
   } = useTimerSettings(loadTournaments);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setMinimumSplashTimeElapsed(true),
+      5_000,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  const startupReady =
+    !loadingTournaments && timerSettingsLoaded && minimumSplashTimeElapsed;
+
+  useEffect(() => {
+    if (!startupReady) {
+      return undefined;
+    }
+
+    setSplashExiting(true);
+    const timeoutId = window.setTimeout(() => setSplashVisible(false), 450);
+    return () => window.clearTimeout(timeoutId);
+  }, [startupReady]);
 
   useEffect(() => {
     if (!loadingTournaments && localStorage.getItem(userTourStorageKey) !== "true") {
@@ -219,7 +245,7 @@ function App() {
           {
             target: '[data-tour="timer-entries"]',
             content:
-              "Track buy-ins, rebuys, and add-ons here. Only enabled buy types are shown. Use the 'Other' category for any miscellaneous entries. Change each count to update chips in play and the prize pool.",
+              "Track buy-ins, rebuys, and add-ons here. Only enabled buy types are shown. Use the 'Other' category for any miscellaneous entries. Change a count to update chips in play and the prize pool.",
             placement: "left",
           },
           {
@@ -414,12 +440,12 @@ function App() {
       payoutModel: draft.payoutModel ?? DEFAULT_PAYOUT_MODEL,
       allowPayoutOverride:
         draft.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE,
-      buyinCount: existingTournament?.buyinCount ?? 0,
-      rebuyCount: existingTournament?.rebuyCount ?? 0,
-      addonCount: existingTournament?.addonCount ?? 0,
+      buyins: existingTournament?.buyins ?? [],
+      rebuys: existingTournament?.rebuys ?? [],
+      addons: existingTournament?.addons ?? [],
       otherPrizePool: existingTournament?.otherPrizePool ?? 0,
       otherChipstack: existingTournament?.otherChipstack ?? 0,
-      bustoutCount: existingTournament?.bustoutCount ?? 0,
+      bustouts: existingTournament?.bustouts ?? [],
       payoutPlaces: existingTournament?.payoutPlaces ?? 0,
       payouts: existingTournament?.payouts ?? [],
       maxPlayersPerTable: existingTournament?.maxPlayersPerTable ?? 0,
@@ -510,25 +536,18 @@ function App() {
         },
       ]
         .filter((entry) => entry.enabled)
-        .map((entry) => ({
-          ...entry,
-          count:
-            activeEntryCountDrafts[entry.countField] ??
-            activeTournament[entry.countField] ??
-            0,
-          contribution:
-            Number(
-              activeEntryCountDrafts[entry.countField] ??
-                activeTournament[entry.countField] ??
-                0,
-            ) * Number(entry.cost ?? 0),
-          chipsInPlay:
-            Number(
-              activeEntryCountDrafts[entry.countField] ??
-                activeTournament[entry.countField] ??
-                0,
-            ) * Number(entry.chipstack ?? 0),
-        }))
+        .map((entry) => {
+          const count = previewParticipantCount(
+            activeEntryCountDrafts[entry.countField],
+            (activeTournament[participantFields[entry.countField]] ?? []).length,
+          );
+          return {
+            ...entry,
+            count,
+            contribution: count * Number(entry.cost ?? 0),
+            chipsInPlay: count * Number(entry.chipstack ?? 0),
+          };
+        })
     : [];
   const totalEntries = entryRows.reduce(
     (total, entry) => total + Number(entry.count ?? 0),
@@ -552,18 +571,19 @@ function App() {
         activeTournament?.otherChipstack ??
         0,
     );
-  const bustoutCount = Number(
-    activeEntryCountDrafts.bustoutCount ??
-      activeTournament?.bustoutCount ??
-      0,
+  const storedBustoutCount = activeTournament?.bustouts?.length ?? 0;
+  const startingPlayers = previewParticipantCount(
+    activeEntryCountDrafts.buyinCount,
+    activeTournament?.buyins?.length ?? 0,
+  );
+  const bustoutCount = previewParticipantCount(
+    activeEntryCountDrafts.bustoutCount,
+    storedBustoutCount,
+    Math.min(MAX_PARTICIPANT_COUNT, Math.max(storedBustoutCount, startingPlayers - 1)),
   );
   const remainingPlayers = Math.max(
     0,
-    Number(
-      activeEntryCountDrafts.buyinCount ??
-        activeTournament?.buyinCount ??
-        0,
-    ) - bustoutCount,
+    startingPlayers - bustoutCount,
   );
   const parsedMaxPlayersPerTable = activeTournament
     ? Number(
@@ -629,18 +649,30 @@ function App() {
   const percentPaid = Number(
     activeTournament?.percentPaid ?? DEFAULT_PERCENT_PAID,
   );
-  const defaultPayoutPlaces = Math.max(
-    1,
-    Math.round((totalEntries * percentPaid) / 100),
-  );
   const allowPayoutOverride =
     activeTournament?.allowPayoutOverride ?? DEFAULT_ALLOW_PAYOUT_OVERRIDE;
-  const effectivePayoutPlaces = allowPayoutOverride && payoutPlaces > 0
-    ? payoutPlaces
-    : defaultPayoutPlaces;
-  const startingPlayers = Number(
-    activeEntryCountDrafts.buyinCount ?? activeTournament?.buyinCount ?? 0,
-  );
+  const payoutValues = [...(activeTournament?.payouts ?? [])];
+  if (activeTournament) {
+    for (const [index, value] of Object.entries(payoutDrafts[activeTournament.id] ?? [])) {
+      if (value != null) {
+        payoutValues[index] = value;
+      }
+    }
+  }
+  const {
+    defaultPayoutPlaces,
+    effectivePayoutPlaces,
+    defaultPayouts,
+    payouts,
+  } = getEffectivePayouts({
+    totalEntries,
+    totalPrizePool,
+    percentPaid,
+    payoutModel: activeTournament?.payoutModel ?? DEFAULT_PAYOUT_MODEL,
+    allowPayoutOverride,
+    payoutPlaces,
+    payouts: payoutValues,
+  });
   const timerMessages = [
     activeTournament?.name,
     startingPlayers > 0
@@ -706,29 +738,9 @@ function App() {
     previousTimerFullscreenRef.current = timerIsFullscreen;
   }, [activeTab, timerIsFullscreen]);
 
-  const defaultPayouts = calculateDefaultPayouts({
-    playersPaid: effectivePayoutPlaces,
-    totalPrizePool,
-    payoutModel: activeTournament?.payoutModel ?? DEFAULT_PAYOUT_MODEL,
-  });
-  const manualPayouts = activeTournament
-    ? Array.from({ length: effectivePayoutPlaces }, (_, index) =>
-        Number(
-          payoutDrafts[activeTournament.id]?.[index] ??
-            activeTournament.payouts?.[index] ??
-            0,
-        ),
-      )
-    : [];
-  const hasManualPayouts = manualPayouts.some((payout) => payout !== 0);
-  const useCalculatedPayouts =
-    !allowPayoutOverride || !hasManualPayouts;
-  const payouts = activeTournament
-    ? useCalculatedPayouts
-      ? defaultPayouts.map((payout) => Number(payout ?? 0))
-      : manualPayouts
-    : [];
-  const payoutTotal = payouts.reduce((total, payout) => total + payout, 0);
+  const payoutTotal = activeTournament
+    ? payouts.reduce((total, payout) => total + payout, 0)
+    : 0;
   const payoutIncrement =
     totalPrizePool <= 10
       ? 1
@@ -1019,8 +1031,9 @@ function App() {
                               <input
                                 type="number"
                                 min="0"
+                                max={MAX_PARTICIPANT_COUNT}
                                 step="1"
-                                value={entry.count}
+                                value={activeEntryCountDrafts[entry.countField] ?? entry.count}
                                 aria-label={`${entry.label} count`}
                                 onChange={(event) => {
                                   const value = event.target.value;
@@ -1031,13 +1044,13 @@ function App() {
                                       [entry.countField]: value,
                                     },
                                   }));
+                                }}
+                                onBlur={(event) => {
                                   updateTournamentField(
                                     activeTournament.id,
                                     entry.countField,
-                                    value,
+                                    event.target.value,
                                   );
-                                }}
-                                onBlur={() => {
                                   flushTournamentFieldUpdates();
                                   setEntryCountDrafts((drafts) => {
                                     const nextDrafts = {
@@ -1165,19 +1178,11 @@ function App() {
                             type="number"
                             data-tour="timer-bustouts"
                             min="0"
-                            max={Math.max(
-                              0,
-                              Number(
-                                activeEntryCountDrafts.buyinCount ??
-                                  activeTournament.buyinCount ??
-                                  0,
-                              ) - 1,
-                            )}
+                            max={Math.min(MAX_PARTICIPANT_COUNT, Math.max(0, startingPlayers - 1))}
                             step="1"
                             value={
                               activeEntryCountDrafts.bustoutCount ??
-                              activeTournament.bustoutCount ??
-                              0
+                              bustoutCount
                             }
                             aria-label="Bustouts count"
                             onChange={(event) => {
@@ -1189,13 +1194,13 @@ function App() {
                                   bustoutCount: value,
                                 },
                               }));
+                            }}
+                            onBlur={(event) => {
                               updateTournamentField(
                                 activeTournament.id,
                                 "bustoutCount",
-                                value,
+                                event.target.value,
                               );
-                            }}
-                            onBlur={() => {
                               flushTournamentFieldUpdates();
                               setEntryCountDrafts((drafts) => {
                                 const nextDrafts = {
@@ -1259,11 +1264,7 @@ function App() {
                       <tfoot>
                         <tr>
                           <th scope="row">
-                            {Number(
-                              activeEntryCountDrafts.bustoutCount ??
-                                activeTournament.bustoutCount ??
-                                0,
-                            ).toLocaleString()}
+                            {bustoutCount.toLocaleString()}
                           </th>
                           <td>{remainingPlayers.toLocaleString()}</td>
                           <td>{averageChipstack.toLocaleString()}</td>
@@ -1569,6 +1570,28 @@ function App() {
           </div>
         )}
       </section>
+      {splashVisible && (
+        <div
+          className={`app-splash${splashExiting ? " app-splash-exiting" : ""}`}
+          role="status"
+          aria-live="polite"
+          aria-hidden={splashExiting}
+        >
+          <div className="app-splash-content">
+            <img
+              className="app-splash-logo"
+              src="/dinkydonk-logo.png"
+              alt="DinkyDonk"
+            />
+            <h1>DinkyDonk</h1>
+            <p>DinkyDonk is Free and Open-Source</p>
+            <div className="app-splash-loader" aria-hidden="true">
+              <span />
+            </div>
+            <span className="app-splash-status">Getting the table ready...</span>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

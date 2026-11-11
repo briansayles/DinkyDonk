@@ -40,12 +40,12 @@ export function useTimer({
   const activeTournamentKey = activeTournament
     ? JSON.stringify({
         ...activeTournament,
-        buyinCount: undefined,
-        rebuyCount: undefined,
-        addonCount: undefined,
+        buyins: undefined,
+        rebuys: undefined,
+        addons: undefined,
         otherPrizePool: undefined,
         otherChipstack: undefined,
-        bustoutCount: undefined,
+        bustouts: undefined,
         payoutPlaces: undefined,
         payouts: undefined,
         maxPlayersPerTable: undefined,

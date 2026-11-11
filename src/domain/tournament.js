@@ -227,6 +227,79 @@ export function calculateDefaultPayouts({
   );
 }
 
+export function getEffectivePayouts({
+  totalEntries,
+  totalPrizePool,
+  percentPaid = DEFAULT_PERCENT_PAID,
+  payoutModel = DEFAULT_PAYOUT_MODEL,
+  allowPayoutOverride = DEFAULT_ALLOW_PAYOUT_OVERRIDE,
+  payoutPlaces = 0,
+  payouts = [],
+}) {
+  const defaultPayoutPlaces = Math.max(
+    1,
+    Math.round((totalEntries * Number(percentPaid)) / 100),
+  );
+  const parsedPlaces = Number(payoutPlaces);
+  const overridePlaces = Number.isFinite(parsedPlaces)
+    ? Math.min(1_000, Math.max(0, Math.floor(parsedPlaces)))
+    : 0;
+  const effectivePayoutPlaces = allowPayoutOverride && overridePlaces > 0
+    ? overridePlaces
+    : defaultPayoutPlaces;
+  const defaultPayouts = calculateDefaultPayouts({
+    playersPaid: effectivePayoutPlaces,
+    totalPrizePool,
+    payoutModel,
+  });
+  const manualPayouts = Array.from({ length: effectivePayoutPlaces }, (_, index) =>
+    Number(payouts[index] ?? 0),
+  );
+  const useCalculatedPayouts =
+    !allowPayoutOverride || !manualPayouts.some((payout) => payout !== 0);
+  return {
+    defaultPayoutPlaces,
+    effectivePayoutPlaces,
+    defaultPayouts,
+    payouts: useCalculatedPayouts
+      ? defaultPayouts.map((payout) => Number(payout ?? 0))
+      : manualPayouts,
+  };
+}
+
+export function updateBustoutPayouts(tournament) {
+  if (!tournament.bustouts?.length) {
+    return tournament;
+  }
+  const counts = [
+    { count: tournament.buyins?.length ?? 0, cost: tournament.buyinCost },
+    ...(tournament.rebuysAllowed
+      ? [{ count: tournament.rebuys?.length ?? 0, cost: tournament.rebuyCost }]
+      : []),
+    ...(tournament.addonsAllowed
+      ? [{ count: tournament.addons?.length ?? 0, cost: tournament.addonCost }]
+      : []),
+  ];
+  const totalEntries = counts.reduce((total, entry) => total + entry.count, 0);
+  const totalPrizePool = counts.reduce(
+    (total, entry) => total + entry.count * Number(entry.cost ?? 0),
+    Number(tournament.otherPrizePool ?? 0),
+  );
+  const { payouts } = getEffectivePayouts({ ...tournament, totalEntries, totalPrizePool });
+  let changed = false;
+  const bustouts = tournament.bustouts.map((bustout) => {
+    const payout = Number.isInteger(bustout.place) && bustout.place > 0
+      ? (payouts[bustout.place - 1] ?? 0)
+      : null;
+    if (bustout.payout === payout) {
+      return bustout;
+    }
+    changed = true;
+    return { ...bustout, payout };
+  });
+  return changed ? { ...tournament, bustouts } : tournament;
+}
+
 export function normalizeEdgeSpotQuantity(quantity) {
   const parsedQuantity = Number(quantity);
   if (!Number.isFinite(parsedQuantity) || parsedQuantity === 0) {
@@ -318,6 +391,15 @@ export function formatChipStackTotal(chips) {
     return "Not set";
   }
   return summary.total.toLocaleString();
+}
+
+export function chipStackMatchesStarting(chips, startingChipstack) {
+  const summary = getChipStackSummary(chips);
+  return startingChipstack !== "" &&
+    startingChipstack != null &&
+    Number.isFinite(Number(startingChipstack)) &&
+    summary.hasQuantities &&
+    summary.total === Number(startingChipstack);
 }
 
 export function formatAmount(value) {
