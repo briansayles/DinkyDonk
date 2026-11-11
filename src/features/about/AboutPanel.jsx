@@ -1,5 +1,3 @@
-import reactLogo from "../../../public/react.svg";
-
 const features = [
   [
     "Tournament timer",
@@ -138,7 +136,7 @@ export default function AboutPanel() {
             <img src="/tauri.svg" alt="Tauri" />
           </a>
           <a href="https://react.dev/" target="_blank" rel="noreferrer">
-            <img src={reactLogo} alt="React" />
+            <img src="/react.svg" alt="React" />
           </a>
           <a href="https://vite.dev/" target="_blank" rel="noreferrer">
             <img src="/vite.svg" alt="Vite" />
