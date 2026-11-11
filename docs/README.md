@@ -1,7 +1,12 @@
 > A fully-functional yet easy-to-use poker tournament timer and manager
 
 <p align="center">
+  1
   <img src="../public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
+  2
+  <img src="../dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
+  3
+  <img src="dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
 </p>
 
 DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
