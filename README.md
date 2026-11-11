@@ -18,7 +18,7 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/briansayles">
-    <img src="public/buy-me-a-coffee-qr.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
+    <img src="public/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
   </a>
 </p>
 

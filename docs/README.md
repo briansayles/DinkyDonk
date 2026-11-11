@@ -1,7 +1,7 @@
 > A fully-functional yet easy-to-use poker tournament timer and manager
 
 <p align="center">
-  <img src="public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
+  <img src="../public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
 </p>
 
 DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
@@ -18,7 +18,7 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/briansayles">
-    <img src="public/buy-me-a-coffee-qr.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
+    <img src="../public/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
   </a>
 </p>
 
@@ -61,14 +61,14 @@ See the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for the pl
 
 <p align="center">
   <a href="https://tauri.app/">
-    <img src="public/tauri.svg" alt="Tauri" height="48">
+    <img src="../public/tauri.svg" alt="Tauri" height="48">
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://react.dev/">
-    <img src="src/assets/react.svg" alt="React" height="48">
+    <img src="../public/react.svg" alt="React" height="48">
   </a>
   &nbsp;&nbsp;&nbsp;
   <a href="https://vite.dev/">
-    <img src="public/vite.svg" alt="Vite" height="48">
+    <img src="../public/vite.svg" alt="Vite" height="48">
   </a>
 </p>

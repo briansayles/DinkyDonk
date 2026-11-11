@@ -1,4 +1,4 @@
-import reactLogo from "../../assets/react.svg";
+import reactLogo from "../../../public/react.svg";
 
 const features = [
   [
@@ -74,7 +74,7 @@ export default function AboutPanel() {
         >
           <img
             className="about-support-qr"
-            src="/buy-me-a-coffee-qr.png"
+            src="/qr-code.png"
             alt="Scan to support DinkyDonk on Buy Me a Coffee"
           />
         </a>
