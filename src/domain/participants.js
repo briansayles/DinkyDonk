@@ -10,7 +10,7 @@ export const participantFields = {
 };
 
 export function previewParticipantCount(draft, currentCount, maxCount = MAX_PARTICIPANT_COUNT) {
-  if (draft == null || draft.trim() === "") {
+  if (draft == null || String(draft).trim() === "") {
     return currentCount;
   }
   const count = Number(draft);
@@ -35,25 +35,12 @@ export function resizeParticipants(participants, count, timestamp = Date.now()) 
   ];
 }
 
-export function resizeBustouts(tournament, count, timestamp = Date.now()) {
-  const bustouts = tournament.bustouts ?? [];
-  if (
-    count > bustouts.length &&
-    count > Math.max(0, (tournament.buyins?.length ?? 0) - 1)
-  ) {
-    throw new RangeError("Bustouts must leave at least one player remaining.");
-  }
-  const resized = resizeParticipants(bustouts, count, timestamp);
-  if (count <= bustouts.length) {
-    return bustouts.slice(bustouts.length - count);
-  }
-
-  const levels = tournament.levels ?? [];
-  const totalDuration = levels.reduce(
+function getElapsedMs(tournament, timestamp) {
+  const totalDuration = (tournament.levels ?? []).reduce(
     (total, level) => total + getLevelDurationMs(level),
     0,
   );
-  const elapsed = Math.min(
+  return Math.min(
     totalDuration,
     Math.max(
       0,
@@ -63,6 +50,56 @@ export function resizeBustouts(tournament, count, timestamp = Date.now()) {
           : 0),
     ),
   );
+}
+
+export function getTournamentEndTimerState(
+  tournament,
+  bustoutCount,
+  timestamp = Date.now(),
+) {
+  if (
+    !tournament.timerIsRunning ||
+    getTournamentEndBustoutCount(tournament, bustoutCount) == null
+  ) {
+    return null;
+  }
+
+  return {
+    timerElapsedMs: getElapsedMs(tournament, timestamp),
+    timerStartedAt: null,
+    timerIsRunning: false,
+  };
+}
+
+export function getTournamentEndBustoutCount(tournament, bustoutCount) {
+  const startingPlayers = tournament.buyins?.length ?? 0;
+  const previousBustoutCount = tournament.bustouts?.length ?? 0;
+  if (
+    startingPlayers <= 1 ||
+    !Number.isInteger(bustoutCount) ||
+    bustoutCount <= previousBustoutCount ||
+    bustoutCount < startingPlayers - 1 ||
+    bustoutCount > startingPlayers
+  ) {
+    return null;
+  }
+
+  return startingPlayers;
+}
+
+export function resizeBustouts(tournament, count, timestamp = Date.now()) {
+  const bustouts = tournament.bustouts ?? [];
+  const startingPlayers = tournament.buyins?.length ?? 0;
+  if (count > bustouts.length && count > startingPlayers) {
+    throw new RangeError("Bustouts cannot exceed the number of players.");
+  }
+  const resized = resizeParticipants(bustouts, count, timestamp);
+  if (count <= bustouts.length) {
+    return bustouts.slice(bustouts.length - count);
+  }
+
+  const levels = tournament.levels ?? [];
+  const elapsed = getElapsedMs(tournament, timestamp);
   let remaining = elapsed;
   let playingMs = 0;
   for (const level of levels) {
@@ -82,9 +119,12 @@ export function resizeBustouts(tournament, count, timestamp = Date.now()) {
     : null;
   const newBustouts = resized.slice(bustouts.length).map((record, index) => ({
     ...record,
+    name: startingPlayers - bustouts.length - index === 1
+      ? "Winner"
+      : record.name,
     blinds,
     elapsedSeconds: Math.floor(playingMs / 1000),
-    place: tournament.buyins.length - bustouts.length - index,
+    place: startingPlayers - bustouts.length - index,
     pointsEarned: null,
   }));
   return [...newBustouts.reverse(), ...bustouts];

@@ -1,9 +1,17 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { MAX_PARTICIPANT_COUNT, previewParticipantCount, resizeBustouts, resizeParticipants } from "./participants.js";
+import {
+  getTournamentEndBustoutCount,
+  getTournamentEndTimerState,
+  MAX_PARTICIPANT_COUNT,
+  previewParticipantCount,
+  resizeBustouts,
+  resizeParticipants,
+} from "./participants.js";
 
 test("valid count drafts update previews without accepting incomplete or invalid values", () => {
   assert.equal(previewParticipantCount("3", 1), 3);
+  assert.equal(previewParticipantCount(3, 1), 3);
   assert.equal(previewParticipantCount("0", 3), 0);
   for (const draft of [undefined, "", "-", "1.5", "-1", "100001", "Infinity"]) {
     assert.equal(previewParticipantCount(draft, 2), 2);
@@ -82,9 +90,82 @@ test("breaks, pauses, timer boundaries and completion are captured correctly", (
   assert.equal(record(15_000, { timerIsRunning: true, timerStartedAt: 201_000 }).elapsedSeconds, 15);
 });
 
-test("bustouts cannot eliminate the last player", () => {
-  assert.throws(() => resizeBustouts(tournament, 5), RangeError);
+test("the tournament-ending bustout also records the winner", () => {
+  assert.equal(getTournamentEndBustoutCount(tournament, 4), 5);
+  const previousBustouts = resizeBustouts(tournament, 3, 3_000);
+  const completedTournament = {
+    ...tournament,
+    bustouts: previousBustouts,
+  };
+  const winnerCount = getTournamentEndBustoutCount(completedTournament, 4);
+  const bustouts = resizeBustouts(completedTournament, winnerCount, 4_000);
+
+  assert.deepEqual(
+    bustouts.map(({ name, place }) => ({ name, place })),
+    [
+      { name: "Winner", place: 1 },
+      { name: "Unnamed", place: 2 },
+      { name: "Unnamed", place: 3 },
+      { name: "Unnamed", place: 4 },
+      { name: "Unnamed", place: 5 },
+    ],
+  );
+  assert.equal(
+    getTournamentEndBustoutCount(
+      { ...completedTournament, bustouts },
+      4,
+    ),
+    null,
+  );
   assert.throws(() => resizeBustouts({ ...tournament, buyins: [] }, 1), RangeError);
   const legacy = { ...tournament, bustouts: Array.from({ length: 5 }, () => ({})) };
   assert.equal(resizeBustouts(legacy, 4).length, 4);
+});
+
+test("the final bustout stops the running tournament timer", () => {
+  assert.deepEqual(getTournamentEndTimerState(tournament, 4, 5_000), {
+    timerElapsedMs: 104_000,
+    timerStartedAt: null,
+    timerIsRunning: false,
+  });
+  const onePlayerLeft = {
+    ...tournament,
+    bustouts: resizeBustouts(tournament, 4, 3_000),
+  };
+  assert.deepEqual(
+    getTournamentEndTimerState(onePlayerLeft, 5, 5_000),
+    {
+      timerElapsedMs: 104_000,
+      timerStartedAt: null,
+      timerIsRunning: false,
+    },
+  );
+});
+
+test("bustouts do not stop the timer before the final player remains", () => {
+  assert.equal(getTournamentEndTimerState(tournament, 3, 5_000), null);
+  assert.equal(
+    getTournamentEndTimerState(
+      { ...tournament, bustouts: Array.from({ length: 4 }, () => ({})) },
+      4,
+      5_000,
+    ),
+    null,
+  );
+  assert.equal(
+    getTournamentEndTimerState(
+      { ...tournament, buyins: [{}] },
+      0,
+      5_000,
+    ),
+    null,
+  );
+  assert.equal(
+    getTournamentEndTimerState(
+      { ...tournament, timerIsRunning: false },
+      4,
+      5_000,
+    ),
+    null,
+  );
 });

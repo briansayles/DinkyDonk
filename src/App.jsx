@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Joyride, STATUS } from "react-joyride";
 import { invoke } from "@tauri-apps/api/core";
+import { downloadDir } from "@tauri-apps/api/path";
 import {
   createNextLevel,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
@@ -12,7 +13,16 @@ import {
   sortChips,
   sortLevels,
 } from "./domain/tournament";
-import { MAX_PARTICIPANT_COUNT, participantFields, previewParticipantCount } from "./domain/participants";
+import {
+  createTournamentCsvExports,
+  sanitizeTournamentCsvFilename,
+} from "./domain/tournamentCsv";
+import {
+  getTournamentEndBustoutCount,
+  MAX_PARTICIPANT_COUNT,
+  participantFields,
+  previewParticipantCount,
+} from "./domain/participants";
 import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
 import { useTournaments } from "./features/tournaments/useTournaments";
@@ -76,6 +86,8 @@ function App() {
   const [bustoutsCollapsed, setBustoutsCollapsed] = useState(false);
   const [payoutsCollapsed, setPayoutsCollapsed] = useState(false);
   const [tablesCollapsed, setTablesCollapsed] = useState(false);
+  const [tournamentExportError, setTournamentExportError] = useState("");
+  const [tournamentExportNotice, setTournamentExportNotice] = useState("");
   const tournamentState = useTournaments();
   const {
     activeTournament,
@@ -353,6 +365,44 @@ function App() {
     }
   }
 
+  async function exportTournament(tournament) {
+    try {
+      setTournamentExportError("");
+      setTournamentExportNotice("");
+      const csvFiles = createTournamentCsvExports(tournament);
+      const filename = sanitizeTournamentCsvFilename(tournament.name);
+      const files = Object.entries(csvFiles).map(([type, contents]) => ({
+        filename: `${filename}-${type}.csv`,
+        contents,
+      }));
+      const filenames = files.map((file) => file.filename);
+      const downloadDirectory = await downloadDir();
+
+      for (const file of files) {
+        const url = URL.createObjectURL(
+          new Blob([file.contents], { type: "text/csv;charset=utf-8" }),
+        );
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = file.filename;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+      }
+      setTournamentExportNotice(
+        `Exported ${filenames.join(" and ")} to ${downloadDirectory}.`,
+      );
+    } catch (error) {
+      console.error("Could not export tournament CSV files.", error);
+      setTournamentExportNotice("");
+      setTournamentExportError(
+        "One or more tournament CSV files could not be exported.",
+      );
+    }
+  }
+
   function editTournament(tournament) {
     setStructureCreationError("");
     setEditingId(tournament.id);
@@ -579,7 +629,7 @@ function App() {
   const bustoutCount = previewParticipantCount(
     activeEntryCountDrafts.bustoutCount,
     storedBustoutCount,
-    Math.min(MAX_PARTICIPANT_COUNT, Math.max(storedBustoutCount, startingPlayers - 1)),
+    Math.min(MAX_PARTICIPANT_COUNT, Math.max(storedBustoutCount, startingPlayers)),
   );
   const remainingPlayers = Math.max(
     0,
@@ -763,7 +813,7 @@ function App() {
         />
         <div className="app-heading-copy">
           <h1 data-tour="app-title">
-            DinkyDonk Poker Tournament Timer and Manager
+            DinkyDonk v{APP_VERSION} Poker Tournament Timer and Manager
           </h1>
           <p className="app-heading-tagline">
             DinkyDonk is Free and Open-Source
@@ -872,6 +922,26 @@ function App() {
                 {storageError}
               </p>
             )}
+            {tournamentExportError && (
+              <p className="storage-error" role="alert">
+                {tournamentExportError}
+              </p>
+            )}
+            {tournamentExportNotice && (
+              <div className="storage-success">
+                <p role="status" aria-live="polite">
+                  {tournamentExportNotice}
+                </p>
+                <button
+                  type="button"
+                  className="storage-success-dismiss"
+                  onClick={() => setTournamentExportNotice("")}
+                  aria-label="Dismiss CSV export notification"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
             {structureCreationError && (
               <p className="storage-error" role="alert">
                 {structureCreationError}
@@ -913,6 +983,7 @@ function App() {
                 editTournament={editTournament}
                 expandedTournamentId={expandedTournamentId}
                 loadingTournaments={loadingTournaments}
+                onExportTournament={exportTournament}
                 onSetActive={activateTournament}
                 saving={saving}
                 setExpandedTournamentId={setExpandedTournamentId}
@@ -1178,7 +1249,7 @@ function App() {
                             type="number"
                             data-tour="timer-bustouts"
                             min="0"
-                            max={Math.min(MAX_PARTICIPANT_COUNT, Math.max(0, startingPlayers - 1))}
+                            max={Math.min(MAX_PARTICIPANT_COUNT, startingPlayers)}
                             step="1"
                             value={
                               activeEntryCountDrafts.bustoutCount ??
@@ -1187,13 +1258,32 @@ function App() {
                             aria-label="Bustouts count"
                             onChange={(event) => {
                               const value = event.target.value;
+                              const parsedCount = Number(value);
+                              const completedBustoutCount =
+                                value.trim() !== "" &&
+                                Number.isInteger(parsedCount)
+                                  ? getTournamentEndBustoutCount(
+                                      activeTournament,
+                                      parsedCount,
+                                    )
+                                  : null;
                               setEntryCountDrafts((drafts) => ({
                                 ...drafts,
                                 [activeTournament.id]: {
                                   ...drafts[activeTournament.id],
-                                  bustoutCount: value,
+                                  bustoutCount:
+                                    completedBustoutCount == null
+                                      ? value
+                                      : String(completedBustoutCount),
                                 },
                               }));
+                              if (completedBustoutCount != null) {
+                                updateTournamentField(
+                                  activeTournament.id,
+                                  "bustoutCount",
+                                  value,
+                                );
+                              }
                             }}
                             onBlur={(event) => {
                               updateTournamentField(
@@ -1584,7 +1674,9 @@ function App() {
               alt="DinkyDonk"
             />
             <h1>DinkyDonk</h1>
-            <p>DinkyDonk is Free and Open-Source</p>
+            <h2>Version {APP_VERSION}</h2>
+            <p>DinkyDonk is Free and Open-Source software distributed under the GNU GPL3 License.</p>
+            <p>Copyright © 2026 Brian Sayles</p>
             <div className="app-splash-loader" aria-hidden="true">
               <span />
             </div>

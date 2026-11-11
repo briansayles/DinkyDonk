@@ -14,6 +14,7 @@ export default function TournamentList({
   editTournament,
   expandedTournamentId,
   loadingTournaments,
+  onExportTournament,
   onSetActive,
   saving,
   setExpandedTournamentId,
@@ -54,6 +55,13 @@ export default function TournamentList({
                           onClick={() => copyTournament(tournament.id)}
                         >
                           Copy
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          onClick={() => onExportTournament(tournament)}
+                        >
+                          Export CSVs
                         </button>
                         <button
                           className={
@@ -162,9 +170,9 @@ export default function TournamentList({
                                 <tr>
                                   <th scope="col">Color</th>
                                   <th className="numeric-column" scope="col">Denomination</th>
-                                  <th className="numeric-column" scope="col">Available</th>
                                   <th className="numeric-column" scope="col">Per player</th>
                                   <th className="numeric-column" scope="col">Per-player stack</th>
+                                  <th className="numeric-column" scope="col">Available</th>
                                   <th className="numeric-column" scope="col">Players supported</th>
                                 </tr>
                               </thead>
@@ -180,11 +188,6 @@ export default function TournamentList({
                                     </td>
                                     <td className="numeric-column">{formatChipNumber(chip.denomination)}</td>
                                     <td className="numeric-column">
-                                      {chip.availableQuantity == null
-                                        ? "—"
-                                        : formatChipNumber(chip.availableQuantity)}
-                                    </td>
-                                    <td className="numeric-column">
                                       {chip.quantityPerPlayer == null
                                         ? "—"
                                         : formatChipNumber(chip.quantityPerPlayer)}
@@ -196,6 +199,11 @@ export default function TournamentList({
                                             Number(chip.denomination) *
                                               Number(chip.quantityPerPlayer),
                                           )}
+                                    </td>
+                                    <td className="numeric-column">
+                                      {chip.availableQuantity == null
+                                        ? "—"
+                                        : formatChipNumber(chip.availableQuantity)}
                                     </td>
                                     <td className="numeric-column">
                                       {getChipSupportedPlayers(chip) != null
@@ -210,12 +218,11 @@ export default function TournamentList({
                               </tbody>
                               <tfoot>
                                 <tr>
-                                  <th colSpan="4" scope="row">
-                                    Totals
-                                  </th>
+                                  <th colSpan="3" scope="row" />
                                   <td className="numeric-column">
                                     {formatChipStackTotal(tournament.chips)}
                                   </td>
+                                  <td />
                                   <td className="numeric-column">
                                     {getMaxChipSupportedPlayers(tournament.chips) != null
                                       ? formatChipNumber(

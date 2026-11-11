@@ -241,7 +241,7 @@ fn default_tournament_structure() -> Tournament {
         (5.0, 10.0),
         (10.0, 20.0),
         (15.0, 30.0),
-        (20.0, 50.0),
+        (20.0, 40.0),
         (30.0, 60.0),
         (40.0, 80.0),
         (50.0, 100.0),
@@ -265,7 +265,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 1.0,
             available_quantity: None,
-            quantity_per_player: None,
+            quantity_per_player: Some(20),
         },
         TournamentChip {
             color: "#ff0000".to_string(),
@@ -274,7 +274,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 5.0,
             available_quantity: None,
-            quantity_per_player: None,
+            quantity_per_player: Some(16),
         },
         TournamentChip {
             color: "#008000".to_string(),
@@ -283,7 +283,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 25.0,
             available_quantity: None,
-            quantity_per_player: None,
+            quantity_per_player: Some(8),
         },
         TournamentChip {
             color: "#000000".to_string(),
@@ -292,7 +292,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 100.0,
             available_quantity: None,
-            quantity_per_player: None,
+            quantity_per_player: Some(2),
         },
     ];
     Tournament {
@@ -1037,6 +1037,19 @@ mod tests {
             tournament
                 .chips
                 .iter()
+                .map(|chip| (chip.denomination, chip.quantity_per_player))
+                .collect::<Vec<_>>(),
+            vec![
+                (1.0, Some(20)),
+                (5.0, Some(16)),
+                (25.0, Some(8)),
+                (100.0, Some(2)),
+            ]
+        );
+        assert_eq!(
+            tournament
+                .chips
+                .iter()
                 .map(|chip| (
                     chip.color.as_str(),
                     chip.text_color.as_deref(),
@@ -1068,7 +1081,7 @@ mod tests {
                 (Some(15.0), Some(5.0), Some(10.0), Some(0.0)),
                 (Some(15.0), Some(10.0), Some(20.0), Some(0.0)),
                 (Some(15.0), Some(15.0), Some(30.0), Some(0.0)),
-                (Some(15.0), Some(20.0), Some(50.0), Some(0.0)),
+                (Some(15.0), Some(20.0), Some(40.0), Some(0.0)),
                 (Some(15.0), Some(30.0), Some(60.0), Some(0.0)),
                 (Some(15.0), Some(40.0), Some(80.0), Some(0.0)),
                 (Some(15.0), Some(50.0), Some(100.0), Some(0.0)),

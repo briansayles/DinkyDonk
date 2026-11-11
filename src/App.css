@@ -389,19 +389,19 @@
 @keyframes timer-panel-color-cycle {
   0%,
   100% {
-    background-color: #123b25;
+    background-color: #35654d;
   }
 
   25% {
-    background-color: #552330;
+    background-color: #50a6c2;
   }
 
   50% {
-    background-color: #111;
+    background-color: #000080;
   }
 
   75% {
-    background-color: #102b49;
+    background-color: #800020;
   }
 }
 
@@ -1507,6 +1507,26 @@
   border-radius: 6px;
   margin: 0 0 1rem;
   color: #a32121;
+}
+
+.storage-success {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #39875b;
+  border-radius: 6px;
+  margin: 0 0 1rem;
+  color: #23643f;
+}
+
+.storage-success p {
+  margin: 0;
+}
+
+.storage-success-dismiss {
+  flex-shrink: 0;
 }
 
 .tournament-form,

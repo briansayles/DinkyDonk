@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { sortChips, sortLevels, updateBustoutPayouts } from "../../domain/tournament";
-import { MAX_PARTICIPANT_COUNT, participantFields, resizeBustouts, resizeParticipants } from "../../domain/participants";
+import {
+  getTournamentEndBustoutCount,
+  getTournamentEndTimerState,
+  MAX_PARTICIPANT_COUNT,
+  participantFields,
+  resizeBustouts,
+  resizeParticipants,
+} from "../../domain/participants";
 
 function normalizeTournaments(tournaments) {
   return tournaments.map((tournament) => ({
@@ -9,6 +16,16 @@ function normalizeTournaments(tournaments) {
     chips: sortChips(tournament.chips ?? []),
     levels: sortLevels(tournament.levels),
   }));
+}
+
+function getBustoutUpdates(tournament, count) {
+  const timestamp = Date.now();
+  const completedBustoutCount =
+    getTournamentEndBustoutCount(tournament, count) ?? count;
+  return {
+    bustouts: resizeBustouts(tournament, completedBustoutCount, timestamp),
+    ...(getTournamentEndTimerState(tournament, count, timestamp) ?? {}),
+  };
 }
 
 export function useTournaments() {
@@ -232,14 +249,19 @@ export function useTournaments() {
       }
       const arrayField = participantFields[field];
       if (field === "bustoutCount" && parsedValue > (currentTournament.bustouts?.length ?? 0) &&
-          parsedValue > Math.max(0, (currentTournament.buyins?.length ?? 0) - 1)) {
-        setStorageError("Bustouts must leave at least one player remaining.");
+          parsedValue > (currentTournament.buyins?.length ?? 0)) {
+        setStorageError("Bustouts cannot exceed the number of players.");
         return;
       }
       updatedFields = {
-        [arrayField]: field === "bustoutCount"
-          ? resizeBustouts(currentTournament, parsedValue)
-          : resizeParticipants(currentTournament[arrayField] ?? [], parsedValue),
+        ...(field === "bustoutCount"
+          ? getBustoutUpdates(currentTournament, parsedValue)
+          : {
+              [arrayField]: resizeParticipants(
+                currentTournament[arrayField] ?? [],
+                parsedValue,
+              ),
+            }),
       };
     } else if (field === "maxPlayersPerTable") {
       const parsedValue = Number(value);
@@ -369,15 +391,23 @@ export function useTournaments() {
     const tournament = tournaments.find((item) => item.id === tournamentId);
     if (field === "bustoutCount" && tournament &&
         parsedCount > (tournament.bustouts?.length ?? 0) &&
-        parsedCount > Math.max(0, (tournament.buyins?.length ?? 0) - 1)) {
-      setStorageError("Bustouts must leave at least one player remaining.");
+        parsedCount > (tournament.buyins?.length ?? 0)) {
+      setStorageError("Bustouts cannot exceed the number of players.");
       return;
     }
     const nextTournaments = tournaments.map((tournament) =>
       tournament.id === tournamentId
-        ? { ...tournament, [arrayField]: field === "bustoutCount"
-          ? resizeBustouts(tournament, parsedCount)
-          : resizeParticipants(tournament[arrayField] ?? [], parsedCount) }
+        ? {
+            ...tournament,
+            ...(field === "bustoutCount"
+              ? getBustoutUpdates(tournament, parsedCount)
+              : {
+                  [arrayField]: resizeParticipants(
+                    tournament[arrayField] ?? [],
+                    parsedCount,
+                  ),
+                }),
+          }
         : tournament,
     );
     if (await persistTournamentData(nextTournaments)) {
