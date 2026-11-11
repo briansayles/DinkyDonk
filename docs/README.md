@@ -1,12 +1,7 @@
 > A fully-functional yet easy-to-use poker tournament timer and manager
 
 <p align="center">
-  1
-  <img src="../public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
-  2
-  <img src="../dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
-  3
-  <img src="dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
+  <img src="/docs/assets/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
 </p>
 
 DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
@@ -23,7 +18,7 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/briansayles">
-    <img src="public/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
+    <img src="/docs/asssets/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
   </a>
 </p>
 
