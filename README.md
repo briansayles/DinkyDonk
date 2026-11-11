@@ -23,6 +23,7 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
 </p>
 
 ## Screenshots
+
 <p>
     <img src="public/Screenshot Timer 1.png" alt="Screenshot Timer 1" width="220">
     <img src="public/Screenshot Timer 2.png" alt="Screenshot Timer 2" width="220">
@@ -34,6 +35,7 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
     <img src="public/Screenshot Settings 1.png" alt="Screenshot Settings 1" width="220">
     <img src="public/Screenshot Settings 2.png" alt="Screenshot Settings 2" width="220">    
 </p>
+
 ## Features
 
 - **Tournament timer:** Run timed blind levels and breaks, see current and upcoming blinds, and follow countdown progress.
