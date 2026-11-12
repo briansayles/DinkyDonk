@@ -36,7 +36,7 @@
 
 ## Installation
 
-Visit the [Releases Page](https://github.com/briansayles/DinkyDonk/Releases) to find and download the compiled version for your operating system.
+Visit the [Releases Page](https://github.com/briansayles/DinkyDonk/releases) to find and download the compiled version for your operating system.
 
 DinkyDonk is not (yet) a signed/trusted application on any platform. The full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk). As a result:
 
