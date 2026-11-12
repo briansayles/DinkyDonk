@@ -1,8 +1,8 @@
 [package]
 name = "dinkydonk"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.3.0"
+description = "DinkyDonk Poker Tournament Manager and Timer"
+authors = ["Brian Sayles"]
 license = "AGPL-3.0-or-later"
 edition = "2024"
 
@@ -24,6 +24,9 @@ tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

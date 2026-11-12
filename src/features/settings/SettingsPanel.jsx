@@ -1,3 +1,7 @@
+import { useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+
 function formatSettingsDirectory(directory) {
   const uncPrefix = "\\\\?\\UNC\\";
   if (directory.startsWith(uncPrefix)) {
@@ -12,7 +16,7 @@ function formatSettingsDirectory(directory) {
 
 export default function SettingsPanel({
   changingSettingsDirectory,
-  onChangeSettingsDirectory,
+  onChangeSettingsFile,
   previewCountdownWarning,
   previewLevelAlarm,
   setTimerSettings,
@@ -21,6 +25,54 @@ export default function SettingsPanel({
   timerSettingsError,
   timerSettingsLoaded,
 }) {
+  const fileDialogRef = useRef(null);
+  const [filePath, setFilePath] = useState("");
+  const [fileDialogError, setFileDialogError] = useState("");
+
+  async function showFileDialog() {
+    const defaultPath = formatSettingsDirectory(settingsDirectory);
+    try {
+      const selection = await invoke("pick_settings_file", { defaultPath });
+      if (selection.supported) {
+        if (selection.path) await onChangeSettingsFile(selection.path);
+      } else {
+        setFilePath(defaultPath);
+        setFileDialogError("");
+        fileDialogRef.current.showModal();
+      }
+    } catch (error) {
+      console.error("Could not open settings file picker.", error);
+      setFileDialogError(`Could not open settings file picker: ${error}`);
+      setFilePath(defaultPath);
+      fileDialogRef.current.showModal();
+    }
+  }
+
+  async function browseSettingsFile() {
+    try {
+      const selected = await open({
+        title: "Open settings file",
+        defaultPath: filePath || undefined,
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (selected) {
+        setFilePath(selected);
+      }
+      setFileDialogError("");
+    } catch (error) {
+      console.error("Could not open settings file picker.", error);
+      setFileDialogError(`Could not open settings file picker: ${error}`);
+    }
+  }
+
+  async function submitSettingsFile(event) {
+    event.preventDefault();
+    if (await onChangeSettingsFile(filePath)) {
+      fileDialogRef.current?.close();
+    }
+  }
+
   return (
     <div className="settings-panel">
       {timerSettingsError && (
@@ -29,24 +81,55 @@ export default function SettingsPanel({
         </p>
       )}
       <section className="settings-section settings-directory-section" aria-labelledby="settings-directory-heading">
-        <h3 id="settings-directory-heading">Settings file directory</h3>
-        <p>Choose where tournament structures and timer preferences are stored.</p>
+        <h3 id="settings-directory-heading">Settings file</h3>
+        <p>Choose an existing JSON settings file or enter a new filename to copy the current settings.</p>
         <button
           type="button"
-          onClick={onChangeSettingsDirectory}
+          onClick={showFileDialog}
           disabled={!timerSettingsLoaded || changingSettingsDirectory}
         >
-          {changingSettingsDirectory ? "Changing..." : "Choose folder"}
+          {changingSettingsDirectory ? "Changing..." : "Choose file"}
         </button>
         <div className="settings-directory-controls">
           <div>
             <p className="settings-directory-path">
               {settingsDirectory
                 ? formatSettingsDirectory(settingsDirectory)
-                : "Loading directory..."}
+                : "Loading settings file..."}
             </p>
           </div>
         </div>
+        <dialog
+          ref={fileDialogRef}
+          className="settings-file-dialog"
+          aria-labelledby="settings-file-dialog-heading"
+          onCancel={(event) => {
+            if (changingSettingsDirectory) event.preventDefault();
+          }}
+        >
+          <form onSubmit={submitSettingsFile}>
+            <h3 id="settings-file-dialog-heading">Choose settings file</h3>
+            <p>Browse for an existing file or edit the path to create a new JSON file.</p>
+            {(fileDialogError || timerSettingsError) && (
+              <p className="storage-error" role="alert">{fileDialogError || timerSettingsError}</p>
+            )}
+            <label className="form-field">
+              File path
+              <input
+                type="text"
+                value={filePath}
+                onChange={(event) => setFilePath(event.target.value)}
+                required
+                disabled={changingSettingsDirectory}
+              />
+            </label>
+            <div className="settings-file-dialog-actions">
+              <button type="button" onClick={browseSettingsFile} disabled={changingSettingsDirectory}>Browse existing file</button>
+              <button type="button" onClick={() => fileDialogRef.current.close()} disabled={changingSettingsDirectory}>Cancel</button>
+              <button type="submit" disabled={changingSettingsDirectory}>Use file</button>
+            </div>
+          </form>
+        </dialog>
       </section>
       <section className="settings-audio-controls" aria-labelledby="settings-audio-heading">
         <h3 id="settings-audio-heading">Audio settings</h3>
@@ -233,7 +316,7 @@ export default function SettingsPanel({
         </button>
       </div>
       <p className="settings-save-status">
-        Settings save automatically in the selected directory.
+        Settings save automatically in the selected file.
       </p>
     </div>
   );

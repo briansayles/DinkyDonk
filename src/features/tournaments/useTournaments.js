@@ -101,7 +101,7 @@ export function useTournaments() {
         console.error("Could not load tournament structures.", error);
         if (active) {
           setStorageError(
-            "Tournament structures could not be synchronized from the settings directory.",
+            "Tournament structures could not be synchronized from the settings file.",
           );
           setLoadingTournaments(false);
         }

@@ -21,7 +21,7 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
     }
 
     const resizeObserver = new ResizeObserver(([entry]) => {
-      const diameter = entry.contentRect.width;
+      const diameter = entry.contentRect.width * 0.75;
       const text = element.textContent ?? "";
       const fontFamily = window.getComputedStyle(element).fontFamily;
       const referenceSize = 100;
@@ -33,7 +33,7 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
 
       const maxFontSize = diameter * 0.4;
       const fontSize = Math.min(maxFontSize, (diameter * 0.7 * referenceSize) / textWidth);
-      element.style.fontSize = `${fontSize}px`;
+      element.style.fontSize = `${fontSize * 0.9}px`;
     });
 
     resizeObserver.observe(element);
@@ -57,6 +57,8 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
         "--chip-color": chip.color, 
         "--chip-edge-spot-color": chip.edgeSpotColor ?? "#ffffff",
         "--chip-text-color": chip.textColor ?? "#ffffff",
+        "--chip-entry-offset": chip.isEnteringBackwards ? "-180%" : "180%",
+        "--chip-exit-offset": chip.isExitingBackwards ? "180%" : "-180%",
         "--chip-edge-spot-quantity": normalizeEdgeSpotQuantity(
           chip.edgeSpotQuantity,
         ),
@@ -292,6 +294,10 @@ export default function TimerPanel({
 }) {
   const currentLevelIndex = currentLevel?.index ?? null;
   const previousLevelIndexRef = useRef(currentLevelIndex);
+  const chipContainerRef = useRef(null);
+  const chipSlotsRef = useRef(new Map());
+  const chipPositionsRef = useRef(new Map());
+  const chipMoveAnimationsRef = useRef(new WeakMap());
   const blindsDirection =
     currentLevelIndex !== null &&
     previousLevelIndexRef.current !== null &&
@@ -302,6 +308,45 @@ export default function TimerPanel({
   useLayoutEffect(() => {
     previousLevelIndexRef.current = currentLevelIndex;
   }, [currentLevelIndex]);
+
+  useLayoutEffect(() => {
+    const positions = new Map();
+    for (const [key, slot] of chipSlotsRef.current) {
+      const top = slot.offsetTop;
+      positions.set(key, top);
+      const previousTop = chipPositionsRef.current.get(key);
+      if (previousTop === undefined || previousTop === top) {
+        continue;
+      }
+
+      const previousAnimation = chipMoveAnimationsRef.current.get(slot);
+      const transform = window.getComputedStyle(slot).transform;
+      const currentOffset = previousAnimation && transform !== "none"
+        ? new DOMMatrixReadOnly(transform).m42
+        : 0;
+      previousAnimation?.cancel();
+      const animation = slot.animate(
+        [
+          { transform: `translateY(${previousTop - top + currentOffset}px)` },
+          { transform: "translateY(0)" },
+        ],
+        { duration: 800, easing: "cubic-bezier(0.2, 0.75, 0.25, 1)" },
+      );
+      chipMoveAnimationsRef.current.set(slot, animation);
+    }
+    chipPositionsRef.current = positions;
+  }, [timerChips]);
+
+  useLayoutEffect(() => {
+    const container = chipContainerRef.current;
+    const observer = new ResizeObserver(() => {
+      chipPositionsRef.current = new Map(
+        [...chipSlotsRef.current].map(([key, slot]) => [key, slot.offsetTop]),
+      );
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const currentBlindsText = !currentLevel
     ? "\u00a0"
@@ -397,17 +442,27 @@ export default function TimerPanel({
         </div>
       )}
       <div 
+        ref={chipContainerRef}
         className="timer-left-chips" 
         aria-label="Chips in use" 
         data-tour="timer-chips"
+        style={{ "--timer-chip-slots": Math.max(4, timerChips.length) }}
       >
         {timerChips.map((chip) => (
-          <TimerChip
+          <div
+            className="timer-chip-slot"
             key={chip.key}
-            chip={chip}
-            onAnimationEnd={onFinishChipAnimation}
-            onDoubleClick={() => onEditSection("edit-entry-chips")}
-          />
+            ref={(slot) => {
+              if (slot) chipSlotsRef.current.set(chip.key, slot);
+              else chipSlotsRef.current.delete(chip.key);
+            }}
+          >
+            <TimerChip
+              chip={chip}
+              onAnimationEnd={onFinishChipAnimation}
+              onDoubleClick={() => onEditSection("edit-entry-chips")}
+            />
+          </div>
         ))}
       </div>
       <div

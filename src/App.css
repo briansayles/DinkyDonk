@@ -638,15 +638,24 @@
 }
 
 .timer-left-chips {
-  display: flex;
+  display: grid;
   grid-area: left-chips;
+  container-type: size;
+  grid-template-rows: repeat(var(--timer-chip-slots), minmax(0, 1fr));
+  overflow: clip;
   min-width: 0;
   min-height: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
   gap: clamp(0.35rem, 1vh, 0.75rem);
   padding: 0.5rem;
+}
+
+.timer-chip-slot {
+  display: flex;
+  container-type: size;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
 }
 
 .timer-right-middle {
@@ -1047,26 +1056,27 @@
 
 .timer-chip {
   display: grid;
-  width: min(100%, 20.52vh, 11.4rem);
+  width: min(100cqw, 100cqh);
+  min-width: 0;
+  min-height: 0;
   aspect-ratio: 1;
   flex: 0 0 auto;
   place-items: center;
-  padding: 0.3rem;
-  border: 1rem solid transparent;
   border-radius: 50%;
   background:
-    linear-gradient(var(--chip-color), var(--chip-color)) padding-box,
+    radial-gradient(
+      circle closest-side,
+      var(--chip-color) calc(75% - 0.15rem),
+      var(--chip-edge-spot-color) calc(75% - 0.15rem) 75%,
+      transparent 75%
+    ),
     repeating-conic-gradient(
         from calc(-360deg /3 /2 / var(--chip-edge-spot-quantity)),
         var(--chip-edge-spot-color) 0deg calc(360deg /3 / var(--chip-edge-spot-quantity)),
         var(--chip-color) calc(360deg /3 / var(--chip-edge-spot-quantity))calc(360deg / var(--chip-edge-spot-quantity))
-      )
-      border-box;
-  box-shadow:
-    inset 0 0 0 0.15rem var(--chip-edge-spot-color),
-    0 0px 0px var(--chip-edge-spot-color);
+      );
   color: var(--chip-text-color);
-  font-size: clamp(0.7rem, 1.92vh, 1.2rem);
+  font-size: clamp(0.63rem, 1.728vh, 1.08rem);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
@@ -1078,34 +1088,34 @@
 }
 
 .timer-chip-entering {
-  animation: timer-chip-add 0.5s ease-out both;
+  animation: timer-chip-add 800ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 .timer-chip-removing {
-  animation: timer-chip-remove 0.5s ease-in forwards;
+  animation: timer-chip-remove 800ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
 }
 
 @keyframes timer-chip-add {
   from {
     opacity: 0;
-    transform: translateX(-1rem) scale(0.7);
+    transform: translateY(var(--chip-entry-offset));
   }
 
   to {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 @keyframes timer-chip-remove {
   from {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: translateY(0);
   }
 
   to {
     opacity: 0;
-    transform: translateX(-1rem) scale(0.7);
+    transform: translateY(var(--chip-exit-offset));
   }
 }
 
@@ -1874,6 +1884,31 @@
 
 .settings-directory-help {
   font-size: 0.9rem;
+}
+
+.settings-file-dialog {
+  width: min(36rem, calc(100% - 2rem));
+  border: 1px solid #b8c2d0;
+  border-radius: 6px;
+  padding: 1.25rem;
+  color: #202a36;
+  background: #f6f6f6;
+}
+
+.settings-file-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.settings-file-dialog form {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-file-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .settings-test-controls {

@@ -27,6 +27,7 @@ export function useTimer({
   const fullscreenExitInProgressRef = useRef(false);
   const fullscreenExitTimerRef = useRef(null);
   const audioContextRef = useRef(null);
+  const previousChipLevelRef = useRef(null);
   const previousLevelRef = useRef(null);
   const previousWarningLevelRef = useRef(null);
   const completedTimerTournamentRef = useRef(null);
@@ -90,6 +91,20 @@ export function useTimer({
     : 0;
 
   useEffect(() => {
+    const levelIndex = currentLevel?.index ?? null;
+    const previousChipLevel = previousChipLevelRef.current;
+    const sameTournament = previousChipLevel?.tournamentId === activeTournament?.id;
+    const levelChanged =
+      sameTournament &&
+      previousChipLevel?.index != null &&
+      levelIndex != null &&
+      previousChipLevel.index !== levelIndex;
+    const movingBackwards = levelChanged && levelIndex < previousChipLevel.index;
+    previousChipLevelRef.current = {
+      tournamentId: activeTournament?.id,
+      index: levelIndex,
+    };
+
     const chipsInUse = activeTournament
       ? getChipsInUse(
           activeTournament.chips ?? [],
@@ -97,24 +112,29 @@ export function useTimer({
           currentLevel?.index,
         )
       : [];
+    const keyCounts = new Map();
     const targetChips = chipsInUse
       .slice(0, MAX_TIMER_CHIPS)
-      .map((chip, index) => ({
-        ...chip,
-        key: `${chip.color}-${chip.denomination}-${index}`,
-      }));
+      .map((chip) => {
+        const identity = JSON.stringify([chip.color, chip.denomination]);
+        const count = keyCounts.get(identity) ?? 0;
+        keyCounts.set(identity, count + 1);
+        return { ...chip, key: `${identity}-${count}` };
+      });
     timerChipsTargetRef.current = targetChips;
 
     setTimerChips((previousChips) => {
       const visiblePreviousChips = previousChips.slice(0, MAX_TIMER_CHIPS);
-      const previousByKey = new Map(
-        visiblePreviousChips.map((chip) => [chip.key, chip]),
-      );
-      const nextChips = targetChips.map((chip) => ({
-        ...chip,
-        isEntering: previousByKey.get(chip.key)?.isEntering ?? true,
-        isExiting: false,
-      }));
+      const previousByKey = new Map(visiblePreviousChips.map((chip) => [chip.key, chip]));
+      const nextChips = targetChips.map((chip) => {
+        const previous = previousByKey.get(chip.key);
+        return {
+          ...chip,
+          isEntering: previous?.isEntering ?? (levelChanged && !previous),
+          isEnteringBackwards: previous?.isEnteringBackwards ?? movingBackwards,
+          isExiting: false,
+        };
+      });
       const targetKeys = new Set(targetChips.map((chip) => chip.key));
       const hasExitingChips = visiblePreviousChips.some(
         (chip) => !targetKeys.has(chip.key),
@@ -123,8 +143,10 @@ export function useTimer({
       return hasExitingChips
         ? visiblePreviousChips.map((chip) => ({
             ...chip,
-            isEntering: targetKeys.has(chip.key) ? chip.isEntering : false,
             isExiting: !targetKeys.has(chip.key),
+            isEntering: targetKeys.has(chip.key) && chip.isEntering,
+            isExitingBackwards: !targetKeys.has(chip.key) &&
+              (levelChanged ? movingBackwards : sameTournament && (chip.isExitingBackwards ?? false)),
           }))
         : nextChips;
     });
@@ -486,26 +508,32 @@ export function useTimer({
   function finishTimerChipAnimation(key, animationName) {
     if (animationName === "timer-chip-remove") {
       setTimerChips((chips) => {
+        const exitingChip = chips.find((chip) => chip.key === key && chip.isExiting);
+        if (!exitingChip) {
+          return chips;
+        }
         const remainingChips = chips.filter((chip) => chip.key !== key);
         if (remainingChips.some((chip) => chip.isExiting)) {
           return remainingChips;
         }
 
-        const remainingByKey = new Map(
-          remainingChips.map((chip) => [chip.key, chip]),
-        );
-        return timerChipsTargetRef.current.map((chip) => ({
-          ...chip,
-          isEntering: remainingByKey.has(chip.key)
-            ? remainingByKey.get(chip.key).isEntering
-            : true,
-          isExiting: false,
-        }));
+        const remainingByKey = new Map(remainingChips.map((chip) => [chip.key, chip]));
+        return timerChipsTargetRef.current.map((chip) => {
+          const previous = remainingByKey.get(chip.key);
+          return {
+            ...chip,
+            isEntering: previous?.isEntering ?? true,
+            isEnteringBackwards: previous?.isEnteringBackwards ?? exitingChip.isExitingBackwards,
+            isExiting: false,
+          };
+        });
       });
     } else if (animationName === "timer-chip-add") {
       setTimerChips((chips) =>
         chips.map((chip) =>
-          chip.key === key ? { ...chip, isEntering: false } : chip,
+          chip.key === key && chip.isEntering
+            ? { ...chip, isEntering: false }
+            : chip,
         ),
       );
     }

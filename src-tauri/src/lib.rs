@@ -394,51 +394,66 @@ fn settings_directory_config_path(app: &tauri::AppHandle) -> Result<PathBuf, Str
     Ok(default_data_dir(app)?.join("settings-directory.json"))
 }
 
-fn configured_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let config_path = settings_directory_config_path(app)?;
+fn configured_data_file_from_config(config_path: &Path, default_dir: &Path) -> Result<PathBuf, String> {
     if !config_path.exists() {
-        return default_data_dir(app);
+        return Ok(app_data_file_path(default_dir));
     }
 
     let contents = fs::read_to_string(config_path)
-        .map_err(|error| format!("Could not read settings directory: {error}"))?;
+        .map_err(|error| format!("Could not read settings location: {error}"))?;
     let configured_path: String = serde_json::from_str(&contents)
-        .map_err(|error| format!("Could not parse settings directory: {error}"))?;
+        .map_err(|error| format!("Could not parse settings location: {error}"))?;
     let path = PathBuf::from(configured_path);
-    if !path.is_dir() {
+    if path.is_dir() {
+        return Ok(app_data_file_path(&path));
+    }
+    if !path.is_file() || !has_json_extension(&path) {
         return Err(format!(
-            "The configured settings directory does not exist: {}",
+            "The configured settings file or directory does not exist: {}",
             path.display()
         ));
     }
-
     Ok(path)
+}
+
+fn configured_data_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    configured_data_file_from_config(&settings_directory_config_path(app)?, &default_data_dir(app)?)
 }
 
 fn app_data_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("DinkyDonk.JSON")
 }
 
-fn read_app_data_from_dir(data_dir: &Path) -> Result<AppData, String> {
-    let path = app_data_file_path(data_dir);
-    if !path.exists() {
-        return Ok(AppData::default());
-    }
+fn has_json_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+}
 
-    let contents = fs::read_to_string(&path)
-        .map_err(|error| format!("Could not read DinkyDonk.JSON: {error}"))?;
-    let mut json: serde_json::Value = serde_json::from_str(&contents)
-        .map_err(|error| format!("Could not parse DinkyDonk.JSON: {error}"))?;
+fn parse_app_data(contents: &str) -> Result<(AppData, serde_json::Value, bool), String> {
+    let mut json: serde_json::Value = serde_json::from_str(contents)
+        .map_err(|error| format!("Could not parse settings file: {error}"))?;
     let mut migrated = migrate_legacy_counts(&mut json)?;
     migrated |= migrate_bustout_order(&mut json)?;
     migrated |= add_missing_bustout_payouts(&mut json);
     let data = AppData::deserialize(&json)
-        .map_err(|error| format!("Could not parse DinkyDonk.JSON: {error}"))?;
+        .map_err(|error| format!("Could not parse settings file: {error}"))?;
+    Ok((data, json, migrated))
+}
+
+fn read_app_data_from_file(path: &Path) -> Result<AppData, String> {
+    if !path.exists() {
+        return Ok(AppData::default());
+    }
+
+    let contents = fs::read_to_string(path)
+        .map_err(|error| format!("Could not read settings file: {error}"))?;
+    let (data, json, migrated) = parse_app_data(&contents)?;
     if migrated {
         let contents = serde_json::to_string_pretty(&json)
-            .map_err(|error| format!("Could not encode DinkyDonk.JSON: {error}"))?;
+            .map_err(|error| format!("Could not encode settings file: {error}"))?;
         fs::write(path, contents)
-            .map_err(|error| format!("Could not save migrated DinkyDonk.JSON: {error}"))?;
+            .map_err(|error| format!("Could not save migrated settings file: {error}"))?;
     }
     Ok(data)
 }
@@ -537,19 +552,19 @@ fn migrate_legacy_counts(data: &mut serde_json::Value) -> Result<bool, String> {
     Ok(changed)
 }
 
-fn write_app_data_to_dir(data_dir: &Path, data: &AppData) -> Result<(), String> {
+fn write_app_data_to_file(path: &Path, data: &AppData) -> Result<(), String> {
     let contents = serde_json::to_string_pretty(data)
-        .map_err(|error| format!("Could not encode DinkyDonk.JSON: {error}"))?;
-    fs::write(app_data_file_path(data_dir), contents)
-        .map_err(|error| format!("Could not save DinkyDonk.JSON: {error}"))
+        .map_err(|error| format!("Could not encode settings file: {error}"))?;
+    fs::write(path, contents)
+        .map_err(|error| format!("Could not save settings file: {error}"))
 }
 
 fn read_app_data(app: &tauri::AppHandle) -> Result<AppData, String> {
-    read_app_data_from_dir(&configured_data_dir(app)?)
+    read_app_data_from_file(&configured_data_file(app)?)
 }
 
 fn write_app_data(app: &tauri::AppHandle, data: &AppData) -> Result<(), String> {
-    write_app_data_to_dir(&configured_data_dir(app)?, data)
+    write_app_data_to_file(&configured_data_file(app)?, data)
 }
 
 fn migrate_legacy_default_tournament_id(data: &mut AppData) -> bool {
@@ -570,7 +585,7 @@ fn migrate_legacy_default_tournament_id(data: &mut AppData) -> bool {
 }
 
 #[tauri::command]
-fn get_settings_directory(
+fn get_settings_file(
     app: tauri::AppHandle,
     persistence: State<'_, PersistenceLock>,
 ) -> Result<String, String> {
@@ -578,47 +593,178 @@ fn get_settings_directory(
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    Ok(configured_data_dir(&app)?.to_string_lossy().into_owned())
+    Ok(configured_data_file(&app)?.to_string_lossy().into_owned())
+}
+
+#[derive(Serialize)]
+struct SettingsFilePickerResult {
+    supported: bool,
+    path: Option<String>,
 }
 
 #[tauri::command(rename_all = "camelCase")]
-fn set_settings_directory(
+async fn pick_settings_file(
+    _window: tauri::WebviewWindow,
+    default_path: String,
+) -> Result<SettingsFilePickerResult, String> {
+    #[cfg(windows)]
+    {
+        let owner = _window.hwnd()
+            .map_err(|error| format!("Could not find the settings window: {error}"))?.0 as isize;
+        let path = tauri::async_runtime::spawn_blocking(move || {
+            pick_settings_file_on_windows(owner, &default_path)
+        }).await.map_err(|error| format!("Could not run settings file picker: {error}"))??;
+        Ok(SettingsFilePickerResult { supported: true, path })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = default_path;
+        Ok(SettingsFilePickerResult { supported: false, path: None })
+    }
+}
+
+#[cfg(windows)]
+fn pick_settings_file_on_windows(owner: isize, default_path: &str) -> Result<Option<String>, String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::{
+        core::{PCWSTR, w},
+        Win32::{
+            Foundation::{ERROR_CANCELLED, HWND},
+            System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED},
+            UI::Shell::{Common::COMDLG_FILTERSPEC, FileOpenDialog, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName, SIGDN_FILESYSPATH},
+        },
+    };
+
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()
+            .map_err(|error| format!("Could not initialize file picker: {error}"))?;
+        let result = (|| -> windows::core::Result<Option<String>> {
+            let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
+            // The Open dialog normally rejects new filenames before the app can create them.
+            dialog.SetOptions((dialog.GetOptions()? & !FOS_FILEMUSTEXIST) | FOS_FORCEFILESYSTEM)?;
+            dialog.SetTitle(w!("Choose settings file"))?;
+            dialog.SetFileTypes(&[COMDLG_FILTERSPEC {
+                pszName: w!("JSON files"),
+                pszSpec: w!("*.json"),
+            }])?;
+            dialog.SetDefaultExtension(w!("json"))?;
+            let path = Path::new(default_path);
+            if let Some(parent) = path.parent().filter(|parent| parent.is_dir()) {
+                let wide_parent: Vec<u16> = parent.as_os_str().encode_wide().chain(Some(0)).collect();
+                let folder: IShellItem = SHCreateItemFromParsingName(PCWSTR(wide_parent.as_ptr()), None)?;
+                dialog.SetFolder(&folder)?;
+            }
+            if let Some(name) = path.file_name() {
+                let wide_name: Vec<u16> = name.encode_wide().chain(Some(0)).collect();
+                dialog.SetFileName(PCWSTR(wide_name.as_ptr()))?;
+            }
+            match dialog.Show(Some(HWND(owner as *mut std::ffi::c_void))) {
+                Ok(()) => {}
+                Err(error) if error.code() == ERROR_CANCELLED.to_hresult() => return Ok(None),
+                Err(error) => return Err(error),
+            }
+            let item = dialog.GetResult()?;
+            let name = item.GetDisplayName(SIGDN_FILESYSPATH)?;
+            let path = name.to_string();
+            CoTaskMemFree(Some(name.0.cast()));
+            Ok(Some(path?))
+        })();
+        CoUninitialize();
+        result.map_err(|error| format!("Could not choose settings file: {error}"))
+    }
+}
+
+fn select_settings_file(path: &Path, config_path: &Path) -> Result<PathBuf, String> {
+    if !has_json_extension(path) {
+        return Err("The settings file must have a .json extension.".to_string());
+    }
+    if !path.is_file() {
+        return Err("The selected settings file does not exist.".to_string());
+    }
+    let selected_file = path.canonicalize()
+        .map_err(|error| format!("Could not resolve the selected settings file: {error}"))?;
+    if config_path.exists() && selected_file == config_path.canonicalize()
+        .map_err(|error| format!("Could not resolve settings configuration: {error}"))? {
+        return Err("The settings configuration cannot be used as a settings file.".to_string());
+    }
+    let contents = fs::read_to_string(&selected_file)
+        .map_err(|error| format!("Could not read the selected settings file: {error}"))?;
+    let (_, json, _) = parse_app_data(&contents)?;
+    if !json.as_object().is_some_and(|fields| {
+        fields.contains_key("tournaments")
+            || fields.contains_key("activeTournamentId")
+            || fields.contains_key("timerSettings")
+    }) {
+        return Err("The selected JSON file does not contain DinkyDonk settings.".to_string());
+    }
+    let config = serde_json::to_string(&selected_file.to_string_lossy().as_ref())
+        .map_err(|error| format!("Could not encode settings location: {error}"))?;
+    fs::write(config_path, config)
+        .map_err(|error| format!("Could not save settings location: {error}"))?;
+    Ok(selected_file)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+fn set_settings_file(
     app: tauri::AppHandle,
     path: String,
     persistence: State<'_, PersistenceLock>,
 ) -> Result<String, String> {
-    let _guard = persistence
-        .0
-        .lock()
+    let _guard = persistence.0.lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let selected_dir = PathBuf::from(path);
-    if !selected_dir.is_dir() {
-        return Err("The selected settings directory does not exist.".to_string());
-    }
+    let selected = select_or_create_settings_file(
+        Path::new(&path),
+        &configured_data_file(&app)?,
+        &settings_directory_config_path(&app)?,
+    )?;
+    Ok(selected.to_string_lossy().into_owned())
+}
 
-    let current_dir = configured_data_dir(&app)?;
-    let selected_dir = selected_dir
+fn select_or_create_settings_file(path: &Path, current_file: &Path, config_path: &Path) -> Result<PathBuf, String> {
+    use std::io::Write;
+
+    if !has_json_extension(path) {
+        return Err("The settings file must have a .json extension.".to_string());
+    }
+    let parent = path.parent().ok_or("The settings file must have a parent directory.")?
         .canonicalize()
         .map_err(|error| format!("Could not resolve the selected directory: {error}"))?;
-    let current_dir = current_dir
+    let name = path.file_name().ok_or("The settings file must have a name.")?;
+    let selected_file = parent.join(name);
+    let config_parent = config_path.parent().ok_or("Settings configuration has no parent directory.")?
         .canonicalize()
-        .map_err(|error| format!("Could not resolve the current settings directory: {error}"))?;
-
-    if selected_dir != current_dir {
-        let current_file = app_data_file_path(&current_dir);
-        let selected_file = app_data_file_path(&selected_dir);
-        if current_file.exists() && !selected_file.exists() {
-            fs::copy(&current_file, &selected_file)
-                .map_err(|error| format!("Could not copy DinkyDonk.JSON: {error}"))?;
-        }
-        let config_path = settings_directory_config_path(&app)?;
-        let contents = serde_json::to_string(&selected_dir.to_string_lossy().as_ref())
-            .map_err(|error| format!("Could not encode settings directory: {error}"))?;
-        fs::write(config_path, contents)
-            .map_err(|error| format!("Could not save settings directory: {error}"))?;
+        .map_err(|error| format!("Could not resolve settings configuration: {error}"))?;
+    let config_name = config_path.file_name().ok_or("Settings configuration has no name.")?;
+    if parent == config_parent && name.to_string_lossy().eq_ignore_ascii_case(&config_name.to_string_lossy()) {
+        return Err("The settings configuration cannot be used as a settings file.".to_string());
     }
-
-    Ok(selected_dir.to_string_lossy().into_owned())
+    match fs::metadata(&selected_file) {
+        Ok(_) => return select_settings_file(&selected_file, config_path),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(format!("Could not inspect the selected settings file: {error}")),
+    }
+    let contents = match fs::read(current_file) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => serde_json::to_vec(&AppData::default())
+            .map_err(|error| format!("Could not encode settings file: {error}"))?,
+        Err(error) => return Err(format!("Could not read the current settings file: {error}")),
+    };
+    let mut destination = match fs::OpenOptions::new().write(true).create_new(true).open(&selected_file) {
+        Ok(destination) => destination,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            return select_settings_file(&selected_file, config_path);
+        }
+        Err(error) => return Err(format!("Could not create settings file: {error}")),
+    };
+    if let Err(error) = destination.write_all(&contents) {
+        drop(destination);
+        return match fs::remove_file(&selected_file) {
+            Ok(()) => Err(format!("Could not write settings file: {error}")),
+            Err(cleanup_error) => Err(format!("Could not write settings file: {error}; could not remove incomplete file: {cleanup_error}")),
+        };
+    }
+    drop(destination);
+    select_settings_file(&selected_file, config_path)
 }
 
 #[tauri::command]
@@ -795,8 +941,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             set_keep_awake,
-            get_settings_directory,
-            set_settings_directory,
+            get_settings_file,
+            pick_settings_file,
+            set_settings_file,
             get_default_tournament_structure,
             load_tournaments,
             save_tournaments,
@@ -814,6 +961,100 @@ mod tests {
         AppData, DEFAULT_TOURNAMENT_ID, LEGACY_DEFAULT_TOURNAMENT_ID, TimerSettings,
         default_tournament_data, migrate_legacy_default_tournament_id,
     };
+
+    #[test]
+    fn choosing_settings_file_creates_a_copy_or_opens_existing_data() {
+        let directory = std::env::temp_dir().join(format!(
+            "dinkydonk-create-settings-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let config = directory.join("settings-directory.json");
+        let current = directory.join("current.json");
+        let new_file = directory.join("new.json");
+        let contents = serde_json::to_string(&super::default_tournament_data()).unwrap();
+        std::fs::write(&current, &contents).unwrap();
+
+        assert!(super::select_or_create_settings_file(&directory.join("wrong.txt"), &current, &config).is_err());
+        assert!(super::select_or_create_settings_file(&config, &current, &config).is_err());
+        assert!(!config.exists());
+        super::select_or_create_settings_file(&new_file, &current, &config).unwrap();
+        assert_eq!(std::fs::read_to_string(&new_file).unwrap(), contents);
+        assert_eq!(super::configured_data_file_from_config(&config, &directory).unwrap(), new_file.canonicalize().unwrap());
+        std::fs::write(&current, r#"{"tournaments":[]}"#).unwrap();
+        super::select_or_create_settings_file(&new_file, &current, &config).unwrap();
+        assert_eq!(std::fs::read_to_string(&new_file).unwrap(), contents);
+
+        std::fs::remove_file(current).unwrap();
+        std::fs::remove_file(new_file).unwrap();
+        std::fs::remove_file(config).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn selected_json_file_is_preserved_and_used_for_subsequent_io() {
+        let directory = std::env::temp_dir().join(format!(
+            "dinkydonk-settings-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let config = directory.join("settings-directory.json");
+        let file = directory.join("other.JSON");
+        let original = serde_json::to_string(&super::default_tournament_data()).unwrap();
+        std::fs::write(&file, &original).unwrap();
+
+        super::select_settings_file(&file, &config).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), original);
+        let configured = super::configured_data_file_from_config(&config, &directory).unwrap();
+        assert_eq!(configured, file.canonicalize().unwrap());
+        let mut data = super::read_app_data_from_file(&configured).unwrap();
+        data.tournaments[0].name = "Selected file".to_string();
+        super::write_app_data_to_file(&configured, &data).unwrap();
+        assert_eq!(super::read_app_data_from_file(&file).unwrap().tournaments[0].name, "Selected file");
+        assert!(!super::app_data_file_path(&directory).exists());
+
+        let wrong_extension = directory.join("wrong.txt");
+        std::fs::write(&wrong_extension, &original).unwrap();
+        assert!(super::select_settings_file(&wrong_extension, &config).is_err());
+        let invalid = directory.join("invalid.json");
+        std::fs::write(&invalid, "not json").unwrap();
+        assert!(super::select_settings_file(&invalid, &config).is_err());
+        std::fs::write(&invalid, r#"{"unrelated": true}"#).unwrap();
+        assert!(super::select_settings_file(&invalid, &config).is_err());
+        assert!(super::select_settings_file(&directory.join("missing.json"), &config).is_err());
+        assert!(super::select_settings_file(&config, &config).is_err());
+        assert_eq!(super::configured_data_file_from_config(&config, &directory).unwrap(), configured);
+
+        std::fs::remove_file(wrong_extension).unwrap();
+        std::fs::remove_file(invalid).unwrap();
+        std::fs::remove_file(file).unwrap();
+        std::fs::remove_file(config).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
+
+    #[test]
+    fn legacy_directory_configuration_resolves_to_default_filename() {
+        let directory = std::env::temp_dir().join(format!(
+            "dinkydonk-legacy-location-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let config = directory.join("settings-directory.json");
+        assert_eq!(
+            super::configured_data_file_from_config(&config, &directory).unwrap(),
+            super::app_data_file_path(&directory)
+        );
+        std::fs::write(&config, serde_json::to_string(&directory.to_string_lossy().as_ref()).unwrap()).unwrap();
+        assert_eq!(
+            super::configured_data_file_from_config(&config, &directory).unwrap(),
+            super::app_data_file_path(&directory)
+        );
+        std::fs::remove_file(config).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
 
     #[test]
     fn legacy_counts_migrate_to_timestamped_arrays_once() {
@@ -938,7 +1179,7 @@ mod tests {
         let path = super::app_data_file_path(&directory);
         std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
 
-        let first = super::read_app_data_from_dir(&directory).unwrap();
+        let first = super::read_app_data_from_file(&path).unwrap();
         assert_eq!(first.tournaments[0].buyins.len(), 2);
         let timestamp = first.tournaments[0].buyins[0].timestamp;
         let saved: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
@@ -948,7 +1189,7 @@ mod tests {
         assert_eq!(saved["tournaments"][0]["bustouts"][0]["name"], "Second");
         assert!(saved["tournaments"][0]["bustouts"][0].get("payout").unwrap().is_null());
         assert_eq!(saved["tournaments"][0]["buyins"][0]["timestamp"], timestamp);
-        let second = super::read_app_data_from_dir(&directory).unwrap();
+        let second = super::read_app_data_from_file(&path).unwrap();
         assert_eq!(second.tournaments[0].buyins[0].timestamp, timestamp);
         assert_eq!(second.tournaments[0].bustouts[0].name, "Second");
 

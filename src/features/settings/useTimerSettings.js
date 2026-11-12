@@ -1,33 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import {
   defaultTimerSettings,
   normalizeTimerSettings,
   timerSettingsStorageKey,
 } from "./timerSettings";
 
-export function useTimerSettings(reloadTournaments) {
+export function useTimerSettings(reloadTournaments, flushTournamentFieldUpdates) {
   const [timerSettings, setTimerSettings] = useState(defaultTimerSettings);
   const [timerSettingsLoaded, setTimerSettingsLoaded] = useState(false);
   const [timerSettingsError, setTimerSettingsError] = useState("");
   const [settingsDirectory, setSettingsDirectory] = useState("");
   const [changingSettingsDirectory, setChangingSettingsDirectory] =
     useState(false);
+  const skipNextTimerSettingsSave = useRef(false);
+  const timerSettingsSave = useRef(Promise.resolve(true));
 
   useEffect(() => {
     let active = true;
 
-    invoke("get_settings_directory")
+    invoke("get_settings_file")
       .then((directory) => {
         if (active) {
           setSettingsDirectory(directory);
         }
       })
       .catch((error) => {
-        console.error("Could not load settings directory.", error);
+        console.error("Could not load settings file location.", error);
         if (active) {
-          setTimerSettingsError("Settings directory could not be loaded.");
+          setTimerSettingsError("Settings file location could not be loaded.");
         }
       });
 
@@ -76,43 +77,49 @@ export function useTimerSettings(reloadTournaments) {
     if (!timerSettingsLoaded) {
       return;
     }
+    if (skipNextTimerSettingsSave.current) {
+      skipNextTimerSettingsSave.current = false;
+      return;
+    }
 
-    invoke("save_timer_settings", { settings: timerSettings })
-      .then(() => setTimerSettingsError(""))
+    timerSettingsSave.current = timerSettingsSave.current
+      .then(() => invoke("save_timer_settings", { settings: timerSettings }))
+      .then(() => {
+        setTimerSettingsError("");
+        return true;
+      })
       .catch((error) => {
         console.error("Could not save timer settings.", error);
         setTimerSettingsError("Timer settings could not be saved.");
+        return false;
       });
   }, [timerSettings, timerSettingsLoaded]);
 
-  async function changeSettingsDirectory() {
+  async function changeSettingsFile(selectedPath) {
     try {
-      const selectedDirectory = await open({
-        directory: true,
-        multiple: false,
-        title: "Choose settings directory",
-      });
-      if (!selectedDirectory) {
-        return;
-      }
-
       setChangingSettingsDirectory(true);
-      await invoke("save_timer_settings", { settings: timerSettings });
-      const directory = await invoke("set_settings_directory", {
-        path: selectedDirectory,
+      await flushTournamentFieldUpdates();
+      if (!(await timerSettingsSave.current)) {
+        throw new Error("Current timer settings could not be saved.");
+      }
+      const file = await invoke("set_settings_file", {
+        path: selectedPath,
       });
-      setSettingsDirectory(directory);
+      setSettingsDirectory(file);
       const [, savedTimerSettings] = await Promise.all([
         reloadTournaments(),
         invoke("load_timer_settings"),
       ]);
-      if (savedTimerSettings) {
-        setTimerSettings(normalizeTimerSettings(savedTimerSettings));
-      }
+      skipNextTimerSettingsSave.current = true;
+      setTimerSettings(savedTimerSettings
+        ? normalizeTimerSettings(savedTimerSettings)
+        : { ...defaultTimerSettings });
       setTimerSettingsError("");
+      return true;
     } catch (error) {
-      console.error("Could not change settings directory.", error);
-      setTimerSettingsError("Settings directory could not be changed.");
+      console.error("Could not change settings location.", error);
+      setTimerSettingsError(`Settings location could not be changed: ${error}`);
+      return false;
     } finally {
       setChangingSettingsDirectory(false);
     }
@@ -120,7 +127,7 @@ export function useTimerSettings(reloadTournaments) {
 
   return {
     changingSettingsDirectory,
-    changeSettingsDirectory,
+    changeSettingsFile,
     setTimerSettings,
     setTimerSettingsError,
     settingsDirectory,

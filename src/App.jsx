@@ -121,14 +121,14 @@ function App() {
   } = tournamentState;
   const {
     changingSettingsDirectory,
-    changeSettingsDirectory,
+    changeSettingsFile,
     setTimerSettings,
     setTimerSettingsError,
     settingsDirectory,
     timerSettings,
     timerSettingsError,
     timerSettingsLoaded,
-  } = useTimerSettings(loadTournaments);
+  } = useTimerSettings(loadTournaments, flushTournamentFieldUpdates);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(
@@ -813,7 +813,7 @@ function App() {
         />
         <div className="app-heading-copy">
           <h1 data-tour="app-title">
-            DinkyDonk v{APP_VERSION} Poker Tournament Timer and Manager
+            DinkyDonk v{APP_VERSION} Poker Tournament Manager and Timer
           </h1>
           <p className="app-heading-tagline">
             DinkyDonk is Free and Open-Source
@@ -906,7 +906,7 @@ function App() {
         ) : activeTab === "Settings" ? (
           <SettingsPanel
             changingSettingsDirectory={changingSettingsDirectory}
-            onChangeSettingsDirectory={changeSettingsDirectory}
+            onChangeSettingsFile={changeSettingsFile}
             previewCountdownWarning={previewCountdownWarning}
             previewLevelAlarm={previewLevelAlarm}
             setTimerSettings={setTimerSettings}

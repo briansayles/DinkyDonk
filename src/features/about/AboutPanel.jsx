@@ -25,7 +25,7 @@ const features = [
   ],
   [
     "Shared-folder updates",
-    "Store tournament data and timer preferences in a selected settings directory. Open app instances check for changes about once per second, so multiple devices sharing that directory can show the same tournament.",
+    "Store tournament data and timer preferences in a selected JSON settings file. Open app instances check for changes about once per second, so multiple devices sharing that file can show the same tournament.",
   ],
   [
     "Alarms and announcements",
@@ -48,9 +48,20 @@ export default function AboutPanel() {
         />
         <h2>Version {APP_VERSION}</h2>
         <p>
-            DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
+            DinkyDonk is a free and open-source desktop poker tournament manager and timer built with Tauri, React, and Vite.
         </p>
       </header>
+
+      <section className="about-features">
+        <h3>Features</h3>
+        <ul>
+          {features.map(([name, description]) => (
+            <li key={name}>
+              <strong>{name}:</strong> {description}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <section className="about-support">
         <h3>Optional support</h3>
@@ -77,17 +88,6 @@ export default function AboutPanel() {
             alt="Scan to support DinkyDonk on Buy Me a Coffee"
           />
         </a>
-      </section>
-
-      <section className="about-features">
-        <h3>Features</h3>
-        <ul>
-          {features.map(([name, description]) => (
-            <li key={name}>
-              <strong>{name}:</strong> {description}
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className="about-development">
