@@ -82,12 +82,68 @@ test("breaks, pauses, timer boundaries and completion are captured correctly", (
     resizeBustouts({ ...tournament, timerIsRunning: false, timerElapsedMs, ...overrides }, 1, 200_000)[0];
   assert.equal(record(0).elapsedSeconds, 0);
   assert.deepEqual(record(59_999).blinds, { smallBlind: 10, bigBlind: 20, ante: 2 });
-  assert.equal(record(60_000).blinds, null);
+  assert.deepEqual(record(60_000).blinds, { smallBlind: 10, bigBlind: 20, ante: 2 });
   assert.equal(record(75_000).elapsedSeconds, 60);
   assert.deepEqual(record(90_000).blinds, { smallBlind: 20, bigBlind: 40, ante: 4 });
-  assert.equal(record(200_000).elapsedSeconds, 120);
-  assert.equal(record(200_000).blinds, null);
+  assert.equal(record(150_000).elapsedSeconds, 120);
+  assert.deepEqual(record(150_000).blinds, { smallBlind: 20, bigBlind: 40, ante: 4 });
+  assert.equal(record(200_000).elapsedSeconds, 170);
+  assert.deepEqual(record(200_000).blinds, { smallBlind: 20, bigBlind: 40, ante: 4 });
   assert.equal(record(15_000, { timerIsRunning: true, timerStartedAt: 201_000 }).elapsedSeconds, 15);
+});
+
+test("bustouts during breaks use the preceding timed blinds and playing time", () => {
+  const levels = [
+    { duration: 1, smallBlind: 10, bigBlind: 20, ante: 2 },
+    { duration: 0.5, isBreak: true },
+    { duration: 0, smallBlind: 100, bigBlind: 200, ante: 20 },
+    { duration: 0.5, isBreak: true },
+    { duration: 1, smallBlind: 20, bigBlind: 40, ante: 4 },
+  ];
+  const duringBreak = {
+    ...tournament,
+    levels,
+    timerElapsedMs: 65_000,
+    timerStartedAt: 1_000,
+  };
+  for (const timestamp of [1_000, 41_000, 55_999]) {
+    const bustout = resizeBustouts(duringBreak, 1, timestamp)[0];
+    assert.deepEqual(bustout.blinds, { smallBlind: 10, bigBlind: 20, ante: 2 });
+    assert.equal(bustout.elapsedSeconds, 60);
+    assert.equal(bustout.timestamp, timestamp);
+  }
+  const beforeFirstBlind = {
+    ...tournament,
+    levels: [{ duration: 1, isBreak: true }, levels[0]],
+    timerIsRunning: false,
+    timerElapsedMs: 30_000,
+  };
+  assert.equal(resizeBustouts(beforeFirstBlind, 1, 200_000)[0].blinds, null);
+});
+
+test("overtime bustouts use the last timed blind level and exclude scheduled breaks", () => {
+  const levels = [
+    { duration: 1, smallBlind: 10, bigBlind: 20, ante: 2 },
+    { duration: 0.5, isBreak: true },
+    { duration: 0, smallBlind: 100, bigBlind: 200, ante: 20 },
+  ];
+  const overtime = {
+    ...tournament,
+    levels,
+    timerElapsedMs: 90_000,
+    timerStartedAt: 1_000,
+    timerIsRunning: true,
+  };
+  const bustout = resizeBustouts(overtime, 1, 21_500)[0];
+  assert.equal(bustout.elapsedSeconds, 80);
+  assert.deepEqual(bustout.blinds, { smallBlind: 10, bigBlind: 20, ante: 2 });
+  assert.deepEqual(getTournamentEndTimerState(overtime, 4, 21_500), {
+    timerElapsedMs: 110_500,
+    timerStartedAt: null,
+    timerIsRunning: false,
+  });
+  assert.equal(resizeBustouts({ ...overtime, levels: [{ duration: 1, isBreak: true }] }, 1, 21_500)[0].blinds, null);
+  assert.equal(resizeBustouts({ ...overtime, levels: [] }, 1, 21_500)[0].blinds, null);
 });
 
 test("the tournament-ending bustout also records the winner", () => {
@@ -103,7 +159,7 @@ test("the tournament-ending bustout also records the winner", () => {
   assert.deepEqual(
     bustouts.map(({ name, place }) => ({ name, place })),
     [
-      { name: "Winner", place: 1 },
+      { name: "Unnamed", place: 1 },
       { name: "Unnamed", place: 2 },
       { name: "Unnamed", place: 3 },
       { name: "Unnamed", place: 4 },

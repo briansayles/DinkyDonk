@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   getChipsInUse,
   getCurrentLevel,
+  getCurrentOrLastLevel,
   getLevelDurationMs,
 } from "../../domain/tournament";
 import { playTimerAlarm } from "./timerAudio";
@@ -30,7 +31,6 @@ export function useTimer({
   const previousChipLevelRef = useRef(null);
   const previousLevelRef = useRef(null);
   const previousWarningLevelRef = useRef(null);
-  const completedTimerTournamentRef = useRef(null);
 
   const elapsedMs = activeTournament?.timerElapsedMs ?? 0;
   const timerIsRunning = activeTournament?.timerIsRunning ?? false;
@@ -63,15 +63,15 @@ export function useTimer({
   const currentElapsedMs =
     startedAt === null
       ? elapsedMs
-      : Math.min(totalDurationMs, elapsedMs + clockNowMs - startedAt);
+      : Math.max(0, elapsedMs + clockNowMs - startedAt);
   const currentLevel = activeTournament
-    ? getCurrentLevel(activeTournament.levels, currentElapsedMs)
+    ? getCurrentOrLastLevel(activeTournament.levels, currentElapsedMs)
     : null;
   const nextLevel =
     activeTournament && currentLevel
       ? getCurrentLevel(activeTournament.levels, currentLevel.endMs)
       : null;
-  const secondProgress = currentLevel
+  const secondProgress = currentLevel?.remainingMs > 0
     ? (currentLevel.remainingMs % 60_000 || 60_000) / 60_000
     : 0;
   const minuteProgress = currentLevel
@@ -190,7 +190,7 @@ export function useTimer({
     if (levelKey !== null) {
       if (currentLevel.remainingMs > warningThresholdMs) {
         armed = true;
-      } else if (startedAt !== null && armed) {
+      } else if (currentLevel.remainingMs > 0 && startedAt !== null && armed) {
         playLevelAlarm(
           currentLevel.level,
           timerSettings.countdownWarningSound,
@@ -257,29 +257,6 @@ export function useTimer({
     }, 10_000);
     return () => window.clearInterval(intervalId);
   }, [timerMessages.length]);
-
-  useEffect(() => {
-    if (
-      startedAt !== null &&
-      totalDurationMs > 0 &&
-      currentElapsedMs >= totalDurationMs
-    ) {
-      if (completedTimerTournamentRef.current !== activeTournament?.id) {
-        completedTimerTournamentRef.current = activeTournament?.id ?? null;
-        updateTournamentTimer(activeTournament.id, {
-          timerElapsedMs: totalDurationMs,
-          timerStartedAt: null,
-          timerIsRunning: false,
-        });
-      }
-    }
-  }, [
-    activeTournament?.id,
-    currentElapsedMs,
-    startedAt,
-    totalDurationMs,
-    updateTournamentTimer,
-  ]);
 
   useEffect(() => {
     function updateFullscreenState() {
@@ -576,7 +553,7 @@ export function useTimer({
   }
 
   function toggleTimer() {
-    if (!activeTournament || totalDurationMs <= 0) {
+    if (!activeTournament || (!timerIsRunning && totalDurationMs <= 0)) {
       return;
     }
 
@@ -588,16 +565,12 @@ export function useTimer({
           ? 0
           : now - activeTournament.timerStartedAt;
       updateTournamentTimer(activeTournament.id, {
-        timerElapsedMs: Math.min(
-          totalDurationMs,
-          elapsedMs + elapsedSinceStart,
-        ),
+        timerElapsedMs: Math.max(0, elapsedMs + elapsedSinceStart),
         timerStartedAt: null,
         timerIsRunning: false,
       });
-    } else if (elapsedMs < totalDurationMs) {
+    } else {
       prepareTimerAudio();
-      completedTimerTournamentRef.current = null;
       updateTournamentTimer(activeTournament.id, {
         timerElapsedMs: elapsedMs,
         timerStartedAt: now,
@@ -608,7 +581,6 @@ export function useTimer({
   }
 
   function resetTimer() {
-    completedTimerTournamentRef.current = null;
     if (activeTournament) {
       updateTournamentTimer(activeTournament.id, {
         timerElapsedMs: 0,
@@ -620,7 +592,6 @@ export function useTimer({
   }
 
   function setTimerPosition(positionMs, now) {
-    completedTimerTournamentRef.current = null;
     if (activeTournament) {
       updateTournamentTimer(activeTournament.id, {
         timerElapsedMs: positionMs,
@@ -640,8 +611,8 @@ export function useTimer({
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs
-        : Math.min(totalDurationMs, elapsedMs + now - startedAt);
-    const levelAtAction = getCurrentLevel(
+        : Math.max(0, elapsedMs + now - startedAt);
+    const levelAtAction = getCurrentOrLastLevel(
       activeTournament.levels,
       elapsedAtAction,
     );
@@ -659,8 +630,8 @@ export function useTimer({
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs
-        : Math.min(totalDurationMs, elapsedMs + now - startedAt);
-    const levelAtAction = getCurrentLevel(
+        : Math.max(0, elapsedMs + now - startedAt);
+    const levelAtAction = getCurrentOrLastLevel(
       activeTournament.levels,
       elapsedAtAction,
     );
@@ -681,8 +652,8 @@ export function useTimer({
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs
-        : Math.min(totalDurationMs, elapsedMs + now - startedAt);
-    const levelAtAction = getCurrentLevel(
+        : Math.max(0, elapsedMs + now - startedAt);
+    const levelAtAction = getCurrentOrLastLevel(
       activeTournament.levels,
       elapsedAtAction,
     );

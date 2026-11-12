@@ -1709,6 +1709,15 @@
   white-space: nowrap;
 }
 
+.starting-blind-multiple {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.starting-blind-multiple-warning {
+  background-color: rgba(235, 193, 44, 0.18);
+}
+
 .chip-stack-match {
   margin-right: 0.35rem;
   color: #248a3d;
@@ -2019,6 +2028,27 @@
 
 .tournament-level-editor-table {
   min-width: 68rem;
+}
+
+.tournament-level-statistics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.tournament-level-statistics .chip-stack-value {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.tournament-level-statistics .aggressiveness-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tournament-level-editor-table .level-change-warning {
+  background-color: rgba(235, 193, 44, 0.18);
 }
 
 .level-action-buttons {

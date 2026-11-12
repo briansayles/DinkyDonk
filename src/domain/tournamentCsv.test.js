@@ -54,6 +54,63 @@ test("tournament CSV exports include the structure and recorded results", () => 
   assert.ok(exports.results.includes('"Remaining Players","1"'));
 });
 
+test("results summarize entry costs, contributions, and totals", () => {
+  const tournament = {
+    buyins: Array.from({ length: 3 }, () => ({ name: "Unnamed" })),
+    rebuys: Array.from({ length: 2 }, () => ({ name: "Unnamed" })),
+    addons: [{ name: "Unnamed" }],
+    rebuysAllowed: true,
+    addonsAllowed: true,
+    buyinCost: 20.5,
+    rebuyCost: 7.25,
+    addonCost: 15.75,
+    startingChipstack: 1000,
+    rebuyChipstack: 1500,
+    addonChipstack: 250,
+    otherPrizePool: 4,
+    otherChipstack: 125,
+  };
+  const summaries = (input) => Object.fromEntries(
+    createTournamentCsvExports(input).results.split("\r\n")
+      .filter((line) => line.startsWith('"Summary",'))
+      .map((line) => {
+        const cells = line.split(",");
+        return [cells[13].slice(1, -1), cells[14].slice(1, -1)];
+      }),
+  );
+  const enabled = summaries(tournament);
+  assert.deepEqual(
+    Object.fromEntries([
+      "Buy-in Cost", "Rebuy Cost", "Add-on Cost",
+      "Buy-in Prize Pool Contribution", "Rebuy Prize Pool Contribution",
+      "Add-on Prize Pool Contribution", "Other Prize Pool", "Total Prize Pool",
+      "Starting Chipstack", "Rebuy Chipstack", "Add-on Chipstack",
+      "Buy-in Chips in Play", "Rebuy Chips in Play", "Add-on Chips in Play",
+      "Other Chipstack", "Total Chips in Play",
+    ].map((key) => [key, enabled[key]])),
+    {
+      "Buy-in Cost": "20.5", "Rebuy Cost": "7.25", "Add-on Cost": "15.75",
+      "Buy-in Prize Pool Contribution": "61.5", "Rebuy Prize Pool Contribution": "14.5",
+      "Add-on Prize Pool Contribution": "15.75", "Other Prize Pool": "4", "Total Prize Pool": "95.75",
+      "Starting Chipstack": "1000", "Rebuy Chipstack": "1500", "Add-on Chipstack": "250",
+      "Buy-in Chips in Play": "3000", "Rebuy Chips in Play": "3000", "Add-on Chips in Play": "250",
+      "Other Chipstack": "125", "Total Chips in Play": "6375",
+    },
+  );
+  const disabledTournament = { ...tournament, rebuysAllowed: false, addonsAllowed: false };
+  const disabled = summaries(disabledTournament);
+  assert.equal(disabled["Rebuy Prize Pool Contribution"], "0");
+  assert.equal(disabled["Add-on Chips in Play"], "0");
+  assert.equal(disabled["Total Prize Pool"], "65.5");
+  assert.equal(disabled["Total Chips in Play"], "3125");
+  assert.ok(createTournamentCsvExports(disabledTournament).results.includes('"Rebuy","1","Unnamed"'));
+
+  const empty = summaries({ buyins: [{}], rebuysAllowed: true, rebuys: [{}] });
+  assert.equal(empty["Buy-in Cost"], "");
+  assert.equal(empty["Total Prize Pool"], "0");
+  assert.equal(empty["Total Chips in Play"], "0");
+});
+
 test("CSV export filenames are safe for local filesystems", () => {
   assert.equal(
     sanitizeTournamentCsvFilename('Championship/Final: "A"'),
@@ -94,7 +151,7 @@ test("the winner's place-one payout is associated with the final bustout and exp
   );
   const winnerRow = exports.results
     .split("\r\n")
-    .find((row) => row.startsWith('"Bustout","1","Winner"'));
+    .find((row) => row.startsWith('"Bustout","1","Unnamed"'));
   assert.ok(winnerRow);
   assert.equal(winnerRow.split(",")[4], '"1"');
   assert.equal(winnerRow.split(",")[10], '"100"');

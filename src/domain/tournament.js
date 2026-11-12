@@ -267,6 +267,13 @@ export function getEffectivePayouts({
   };
 }
 
+export function getEntryContributions(count, cost, chipstack) {
+  return {
+    contribution: count * Number(cost ?? 0),
+    chipsInPlay: count * Number(chipstack ?? 0),
+  };
+}
+
 export function updateBustoutPayouts(tournament) {
   if (!tournament.bustouts?.length) {
     return tournament;
@@ -400,6 +407,71 @@ export function chipStackMatchesStarting(chips, startingChipstack) {
     Number.isFinite(Number(startingChipstack)) &&
     summary.hasQuantities &&
     summary.total === Number(startingChipstack);
+}
+
+export function getStartingBigBlindMultiple(startingChipstack, levels) {
+  const firstBigBlind = levels.find((level) => !level.isBreak)?.bigBlind;
+  if (
+    startingChipstack == null || String(startingChipstack).trim() === "" ||
+    firstBigBlind == null || String(firstBigBlind).trim() === ""
+  ) {
+    return null;
+  }
+  const stack = Number(startingChipstack);
+  const bigBlind = Number(firstBigBlind);
+  if (!Number.isFinite(stack) || stack < 0 || !Number.isFinite(bigBlind) || bigBlind <= 0) {
+    return null;
+  }
+  const multiple = stack / bigBlind;
+  return Number.isFinite(multiple) ? multiple : null;
+}
+
+export function getLevelStatistics(levels) {
+  const blindLevels = levels.filter((level) => !level.isBreak);
+  const parseNonNegative = (value) => {
+    if (value == null || String(value).trim() === "") {
+      return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : null;
+  };
+  const durations = blindLevels.map((level) => parseNonNegative(level.duration));
+  const blinds = blindLevels.map((level) => parseNonNegative(level.bigBlind));
+  const averageTime = durations.length > 0 && durations.every((value) => value !== null)
+    ? durations.reduce((total, value) => total + value, 0) / durations.length
+    : null;
+  let averageGrowth = null;
+  if (blinds.length > 1 && blinds.every((value) => value !== null)) {
+    let totalGrowth = 0;
+    for (let index = 1; index < blinds.length; index += 1) {
+      if (blinds[index - 1] === 0) {
+        totalGrowth = null;
+        break;
+      }
+      totalGrowth += (blinds[index] - blinds[index - 1]) / blinds[index - 1];
+    }
+    if (totalGrowth !== null && Number.isFinite(totalGrowth)) {
+      averageGrowth = totalGrowth / (blinds.length - 1);
+    }
+  }
+  const aggressiveness = averageGrowth !== null && Number.isFinite(averageTime) && averageTime > 0
+    ? averageGrowth / averageTime
+    : null;
+  return {
+    averageGrowth,
+    averageTime: Number.isFinite(averageTime) ? averageTime : null,
+    aggressiveness: Number.isFinite(aggressiveness) ? aggressiveness : null,
+  };
+}
+
+export function getAggressivenessEvaluation(aggressiveness) {
+  if (!Number.isFinite(aggressiveness)) {
+    return null;
+  }
+  if (aggressiveness <= 0.02) {
+    return "Slow";
+  }
+  return aggressiveness < 0.04 ? "Balanced" : "Fast";
 }
 
 export function formatAmount(value) {
@@ -568,22 +640,59 @@ export function sortLevels(levels) {
     (Number(second.smallBlind ?? 0) +
       Number(second.bigBlind ?? 0) +
       Number(second.ante ?? 0));
-  const sortedLevels = [];
-  let regularLevels = [];
+  const regularLevels = levels
+    .filter((level) => !level.isBreak)
+    .map((level) => ({ ...level, isBreak: false }))
+    .sort(compareBlindValues);
+  let regularIndex = 0;
+  return levels.map((level) =>
+    level.isBreak ? { ...level, isBreak: true } : regularLevels[regularIndex++],
+  );
+}
 
-  for (const level of levels) {
-    if (level.isBreak) {
-      sortedLevels.push(
-        ...regularLevels.sort(compareBlindValues),
-        { ...level, isBreak: true },
-      );
-      regularLevels = [];
-    } else {
-      regularLevels.push({ ...level, isBreak: false });
-    }
+function hasLevelChange(levels, index, isLargeChange) {
+  const level = levels[index];
+  if (!level || level.isBreak) {
+    return false;
+  }
+  const previousLevel = levels.slice(0, index).reverse().find((item) => !item.isBreak);
+  if (!previousLevel) {
+    return false;
   }
 
-  return [...sortedLevels, ...regularLevels.sort(compareBlindValues)];
+  return ["smallBlind", "bigBlind"].some((field) => {
+    const current = level[field];
+    const previous = previousLevel[field];
+    if (
+      current == null || previous == null ||
+      String(current).trim() === "" || String(previous).trim() === ""
+    ) {
+      return false;
+    }
+    const currentValue = Number(current);
+    const previousValue = Number(previous);
+    if (
+      !Number.isFinite(currentValue) || currentValue < 0 ||
+      !Number.isFinite(previousValue) || previousValue < 0
+    ) {
+      return false;
+    }
+    if (previousValue === 0) {
+      return isLargeChange && currentValue > 0;
+    }
+    const ratio = currentValue / previousValue;
+    return isLargeChange
+      ? ratio > 1.5 + Number.EPSILON * 4
+      : ratio < 1.25 - Number.EPSILON * 4;
+  });
+}
+
+export function hasSmallLevelChange(levels, index) {
+  return hasLevelChange(levels, index, false);
+}
+
+export function hasLargeLevelChange(levels, index) {
+  return hasLevelChange(levels, index, true);
 }
 
 export function getLevelDurationMs(level) {
@@ -608,6 +717,24 @@ export function getCurrentLevel(levels, elapsedMs) {
   }
 
   return null;
+}
+
+export function getCurrentOrLastLevel(levels, elapsedMs) {
+  const currentLevel = getCurrentLevel(levels, elapsedMs);
+  if (currentLevel) {
+    return currentLevel;
+  }
+
+  let endMs = 0;
+  let lastLevel = null;
+  for (let index = 0; index < levels.length; index += 1) {
+    const startMs = endMs;
+    endMs += getLevelDurationMs(levels[index]);
+    if (endMs > startMs) {
+      lastLevel = { level: levels[index], index, startMs, endMs, remainingMs: 0 };
+    }
+  }
+  return elapsedMs >= endMs ? lastLevel : null;
 }
 
 export function formatClock(milliseconds) {

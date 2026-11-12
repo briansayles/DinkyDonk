@@ -36,19 +36,12 @@ export function resizeParticipants(participants, count, timestamp = Date.now()) 
 }
 
 function getElapsedMs(tournament, timestamp) {
-  const totalDuration = (tournament.levels ?? []).reduce(
-    (total, level) => total + getLevelDurationMs(level),
+  return Math.max(
     0,
-  );
-  return Math.min(
-    totalDuration,
-    Math.max(
-      0,
-      (tournament.timerElapsedMs ?? 0) +
-        (tournament.timerIsRunning && tournament.timerStartedAt != null
-          ? Math.max(0, timestamp - tournament.timerStartedAt)
-          : 0),
-    ),
+    (tournament.timerElapsedMs ?? 0) +
+      (tournament.timerIsRunning && tournament.timerStartedAt != null
+        ? Math.max(0, timestamp - tournament.timerStartedAt)
+        : 0),
   );
 }
 
@@ -102,14 +95,27 @@ export function resizeBustouts(tournament, count, timestamp = Date.now()) {
   const elapsed = getElapsedMs(tournament, timestamp);
   let remaining = elapsed;
   let playingMs = 0;
+  let totalDuration = 0;
   for (const level of levels) {
-    const duration = Math.min(remaining, getLevelDurationMs(level));
+    const levelDuration = getLevelDurationMs(level);
+    totalDuration += levelDuration;
+    const duration = Math.min(remaining, levelDuration);
     if (!level.isBreak) {
       playingMs += duration;
     }
     remaining -= duration;
   }
-  const level = getCurrentLevel(levels, elapsed)?.level;
+  if (totalDuration > 0) {
+    playingMs += remaining;
+  }
+  const currentLevel = getCurrentLevel(levels, elapsed);
+  const level = currentLevel && !currentLevel.level.isBreak
+    ? currentLevel.level
+    : totalDuration > 0
+      ? levels.slice(0, currentLevel?.index ?? levels.length).reverse().find(
+        (candidate) => !candidate.isBreak && getLevelDurationMs(candidate) > 0,
+      )
+      : null;
   const blinds = level && !level.isBreak
     ? {
         smallBlind: level.smallBlind ?? null,
@@ -119,9 +125,6 @@ export function resizeBustouts(tournament, count, timestamp = Date.now()) {
     : null;
   const newBustouts = resized.slice(bustouts.length).map((record, index) => ({
     ...record,
-    name: startingPlayers - bustouts.length - index === 1
-      ? "Winner"
-      : record.name,
     blinds,
     elapsedSeconds: Math.floor(playingMs / 1000),
     place: startingPlayers - bustouts.length - index,

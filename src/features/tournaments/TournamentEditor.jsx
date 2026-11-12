@@ -1,10 +1,16 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   createNextLevel,
   chipStackMatchesStarting,
   formatChipNumber,
   formatChipStackTotal,
+  getAggressivenessEvaluation,
   getChipSupportedPlayers,
+  getLevelStatistics,
   getMaxChipSupportedPlayers,
+  getStartingBigBlindMultiple,
+  hasLargeLevelChange,
+  hasSmallLevelChange,
   DEFAULT_EDGE_SPOT_QUANTITY,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
   DEFAULT_PAYOUT_MODEL,
@@ -14,6 +20,11 @@ import {
   PAYOUT_MODELS,
 } from "../../domain/tournament";
 import CurrencyInput from "../../components/CurrencyInput";
+
+const SMALL_LEVEL_CHANGE_WARNING =
+  "Small change from previous level. Consider removing this level or the previous one.";
+const LARGE_LEVEL_CHANGE_WARNING =
+  "Large change from previous level. Consider adding a level between this level and the previous one.";
 
 export default function TournamentEditor({
   deleteTournament,
@@ -26,6 +37,36 @@ export default function TournamentEditor({
   setEditingId,
   updateLevel,
 }) {
+  const [startingChipstackFocused, setStartingChipstackFocused] = useState(false);
+  const startingChipstackRef = useRef(null);
+  useLayoutEffect(() => {
+    const value = draft?.startingChipstack;
+    const number = Number(value);
+    const invalid = value != null && value !== "" &&
+      (!Number.isFinite(number) || !Number.isInteger(number) || number < 0);
+    startingChipstackRef.current?.setCustomValidity(
+      invalid ? "Starting chipstack must be a non-negative whole number." : "",
+    );
+  }, [draft?.startingChipstack, startingChipstackFocused]);
+
+  const startingBigBlindMultiple = draft
+    ? getStartingBigBlindMultiple(draft.startingChipstack, draft.levels)
+    : null;
+  const levelStatistics = draft ? getLevelStatistics(draft.levels) : null;
+  const percentFormat = new Intl.NumberFormat(undefined, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
+  const wholeNumberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
+  const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+  const stackWarning = startingBigBlindMultiple === null
+    ? undefined
+    : startingBigBlindMultiple < 50
+      ? "Short-stack tournament"
+      : startingBigBlindMultiple >= 200
+        ? "Deep-stack tournament"
+        : undefined;
+
   return (
     <>
             {draft && (
@@ -56,11 +97,21 @@ export default function TournamentEditor({
                     <label className="form-field">
                       Starting Chipstack
                       <input
-                        type="number"
+                        ref={startingChipstackRef}
+                        type={startingChipstackFocused ? "number" : "text"}
                         min="0"
                         step="1"
-                        value={draft.startingChipstack}
+                        inputMode="numeric"
+                        value={
+                          startingChipstackFocused ||
+                          draft.startingChipstack === "" ||
+                          draft.startingChipstack == null
+                            ? (draft.startingChipstack ?? "")
+                            : formatChipNumber(draft.startingChipstack)
+                        }
                         disabled={saving}
+                        onFocus={() => setStartingChipstackFocused(true)}
+                        onBlur={() => setStartingChipstackFocused(false)}
                         onChange={(event) =>
                           setDraft((current) => ({
                             ...current,
@@ -607,22 +658,27 @@ export default function TournamentEditor({
                       </tr>
                     </thead>
                     <tbody>
-                      {draft.levels.map((level, index) => (
-                        <tr key={index}>
-                          <th scope="row">
+                      {draft.levels.map((level, index) => {
+                        const warning = [
+                          hasSmallLevelChange(draft.levels, index) && SMALL_LEVEL_CHANGE_WARNING,
+                          hasLargeLevelChange(draft.levels, index) && LARGE_LEVEL_CHANGE_WARNING,
+                        ].filter(Boolean).join(" ") || undefined;
+                        return <tr key={index} className={warning ? "level-change-warning" : undefined}>
+                          <th scope="row" title={warning}>
                             {level.isBreak
                               ? "Break"
                               : draft.levels
                                   .slice(0, index + 1)
                                   .filter((item) => !item.isBreak).length}
                           </th>
-                          <td>
+                          <td title={warning}>
                             <input
                               type="number"
                               min="0"
                               step="any"
                               value={level.duration ?? ""}
                               disabled={saving}
+                              aria-description={warning}
                               aria-label={`${
                                 level.isBreak
                                   ? "Break"
@@ -635,7 +691,7 @@ export default function TournamentEditor({
                               }
                             />
                           </td>
-                          <td>
+                          <td title={warning}>
                             {!level.isBreak && (
                               <input
                                 type="number"
@@ -643,6 +699,7 @@ export default function TournamentEditor({
                                 step="any"
                                 value={level.smallBlind ?? ""}
                                 disabled={saving}
+                                aria-description={warning}
                                 aria-label={`Level ${draft.levels
                                   .slice(0, index + 1)
                                   .filter((item) => !item.isBreak).length} Small Blind`}
@@ -656,7 +713,7 @@ export default function TournamentEditor({
                               />
                             )}
                           </td>
-                          <td>
+                          <td title={warning}>
                             {!level.isBreak && (
                               <input
                                 type="number"
@@ -664,6 +721,7 @@ export default function TournamentEditor({
                                 step="any"
                                 value={level.bigBlind ?? ""}
                                 disabled={saving}
+                                aria-description={warning}
                                 aria-label={`Level ${draft.levels
                                   .slice(0, index + 1)
                                   .filter((item) => !item.isBreak).length} Big Blind`}
@@ -677,7 +735,7 @@ export default function TournamentEditor({
                               />
                             )}
                           </td>
-                          <td>
+                          <td title={warning}>
                             {!level.isBreak && (
                               <input
                                 type="number"
@@ -685,6 +743,7 @@ export default function TournamentEditor({
                                 step="any"
                                 value={level.ante ?? ""}
                                 disabled={saving}
+                                aria-description={warning}
                                 aria-label={`Level ${draft.levels
                                   .slice(0, index + 1)
                                   .filter((item) => !item.isBreak).length} ante`}
@@ -694,7 +753,7 @@ export default function TournamentEditor({
                               />
                             )}
                           </td>
-                          <td>
+                          <td title={warning}>
                             <div className="level-action-buttons">
                               <button
                                 className="danger-button"
@@ -784,10 +843,58 @@ export default function TournamentEditor({
                               )}
                             </div>
                           </td>
-                        </tr>
-                      ))}
+                        </tr>;
+                      })}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="tournament-level-statistics">
+                  <label className="form-field">
+                    Starting Stack in Multiples of Big Blind
+                    <output
+                      className={`chip-stack-value starting-blind-multiple${stackWarning ? " starting-blind-multiple-warning" : ""}`}
+                      title={stackWarning}
+                      aria-description={stackWarning}
+                    >
+                      {startingBigBlindMultiple === null
+                        ? "Not set"
+                        : wholeNumberFormat.format(startingBigBlindMultiple)}
+                    </output>
+                  </label>
+                  <label className="form-field">
+                    Average Big Blind Growth per Level
+                    <output className="chip-stack-value">
+                      {levelStatistics.averageGrowth === null
+                        ? "Not set"
+                        : percentFormat.format(levelStatistics.averageGrowth)}
+                    </output>
+                  </label>
+                  <label className="form-field">
+                    Average Time per Level
+                    <output className="chip-stack-value">
+                      {levelStatistics.averageTime === null
+                        ? "Not set"
+                        : `${numberFormat.format(levelStatistics.averageTime)} min`}
+                    </output>
+                  </label>
+                  <label className="form-field">
+                    Aggressiveness
+                    <output
+                      className="chip-stack-value aggressiveness-value"
+                      title="Average big blind growth divided by average level time."
+                    >
+                      {levelStatistics.aggressiveness === null
+                        ? "Not set"
+                        : `${wholeNumberFormat.format(levelStatistics.aggressiveness * 100)}% Big Blind Growth / Minute`}
+                    </output>
+                  </label>
+                  <label className="form-field">
+                    Aggressiveness Evaluation
+                    <output className="chip-stack-value">
+                      {getAggressivenessEvaluation(levelStatistics.aggressiveness) ?? "Not set"}
+                    </output>
+                  </label>
                 </div>
 
                 <div className="tournament-form-actions">

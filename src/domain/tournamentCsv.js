@@ -1,3 +1,5 @@
+import { getEntryContributions } from "./tournament.js";
+
 const structureColumns = [
   "Section",
   "Index",
@@ -102,6 +104,23 @@ export function createTournamentCsvExports(tournament) {
   const rebuys = tournament.rebuys ?? [];
   const addons = tournament.addons ?? [];
   const bustouts = tournament.bustouts ?? [];
+  const buyinTotals = getEntryContributions(
+    buyins.length, tournament.buyinCost, tournament.startingChipstack,
+  );
+  const rebuyTotals = getEntryContributions(
+    tournament.rebuysAllowed ? rebuys.length : 0,
+    tournament.rebuyCost,
+    tournament.rebuyChipstack,
+  );
+  const addonTotals = getEntryContributions(
+    tournament.addonsAllowed ? addons.length : 0,
+    tournament.addonCost,
+    tournament.addonChipstack,
+  );
+  const totalPrizePool = buyinTotals.contribution + rebuyTotals.contribution +
+    addonTotals.contribution + Number(tournament.otherPrizePool ?? 0);
+  const totalChipsInPlay = buyinTotals.chipsInPlay + rebuyTotals.chipsInPlay +
+    addonTotals.chipsInPlay + Number(tournament.otherChipstack ?? 0);
 
   const structureRows = [
     settingRow("ID", tournament.id),
@@ -158,6 +177,20 @@ export function createTournamentCsvExports(tournament) {
     ),
     summaryRow("Other Prize Pool", tournament.otherPrizePool),
     summaryRow("Other Chipstack", tournament.otherChipstack),
+    summaryRow("Buy-in Cost", tournament.buyinCost),
+    summaryRow("Rebuy Cost", tournament.rebuyCost),
+    summaryRow("Add-on Cost", tournament.addonCost),
+    summaryRow("Buy-in Prize Pool Contribution", buyinTotals.contribution),
+    summaryRow("Rebuy Prize Pool Contribution", rebuyTotals.contribution),
+    summaryRow("Add-on Prize Pool Contribution", addonTotals.contribution),
+    summaryRow("Total Prize Pool", totalPrizePool),
+    summaryRow("Starting Chipstack", tournament.startingChipstack),
+    summaryRow("Rebuy Chipstack", tournament.rebuyChipstack),
+    summaryRow("Add-on Chipstack", tournament.addonChipstack),
+    summaryRow("Buy-in Chips in Play", buyinTotals.chipsInPlay),
+    summaryRow("Rebuy Chips in Play", rebuyTotals.chipsInPlay),
+    summaryRow("Add-on Chips in Play", addonTotals.chipsInPlay),
+    summaryRow("Total Chips in Play", totalChipsInPlay),
     ...entryRows(
       "Buy-in",
       buyins,

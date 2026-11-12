@@ -589,10 +589,7 @@ export default function TimerPanel({
             type="button"
             onClick={onToggleTimer}
             data-tour="timer-play-pause"
-            disabled={
-              totalDurationMs === 0 ||
-              (startedAt === null && elapsedMs >= totalDurationMs)
-            }
+            disabled={totalDurationMs === 0 && startedAt === null}
             aria-label={startedAt === null ? "Play timer" : "Pause timer"}
             title={startedAt === null ? "Play timer" : "Pause timer"}
           >

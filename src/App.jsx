@@ -8,6 +8,7 @@ import {
   DEFAULT_PAYOUT_MODEL,
   DEFAULT_PERCENT_PAID,
   formatCurrency,
+  getEntryContributions,
   getEffectivePayouts,
   normalizeEdgeSpotQuantity,
   sortChips,
@@ -18,7 +19,6 @@ import {
   sanitizeTournamentCsvFilename,
 } from "./domain/tournamentCsv";
 import {
-  getTournamentEndBustoutCount,
   MAX_PARTICIPANT_COUNT,
   participantFields,
   previewParticipantCount,
@@ -594,8 +594,7 @@ function App() {
           return {
             ...entry,
             count,
-            contribution: count * Number(entry.cost ?? 0),
-            chipsInPlay: count * Number(entry.chipstack ?? 0),
+            ...getEntryContributions(count, entry.cost, entry.chipstack),
           };
         })
     : [];
@@ -1251,58 +1250,34 @@ function App() {
                             min="0"
                             max={Math.min(MAX_PARTICIPANT_COUNT, startingPlayers)}
                             step="1"
-                            value={
-                              activeEntryCountDrafts.bustoutCount ??
-                              bustoutCount
-                            }
+                            value={bustoutCount}
                             aria-label="Bustouts count"
-                            onChange={(event) => {
-                              const value = event.target.value;
-                              const parsedCount = Number(value);
-                              const completedBustoutCount =
-                                value.trim() !== "" &&
-                                Number.isInteger(parsedCount)
-                                  ? getTournamentEndBustoutCount(
-                                      activeTournament,
-                                      parsedCount,
-                                    )
-                                  : null;
-                              setEntryCountDrafts((drafts) => ({
-                                ...drafts,
-                                [activeTournament.id]: {
-                                  ...drafts[activeTournament.id],
-                                  bustoutCount:
-                                    completedBustoutCount == null
-                                      ? value
-                                      : String(completedBustoutCount),
-                                },
-                              }));
-                              if (completedBustoutCount != null) {
-                                updateTournamentField(
-                                  activeTournament.id,
-                                  "bustoutCount",
-                                  value,
-                                );
+                            aria-description="Use the spinner or arrow keys to adjust the count."
+                            onKeyDown={(event) => {
+                              const navigationKeys = [
+                                "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+                                "Home", "End", "Tab", "Shift", "Control", "Meta",
+                                "Alt", "Escape",
+                              ];
+                              const copyOrSelect =
+                                (event.ctrlKey || event.metaKey) &&
+                                ["a", "c"].includes(event.key.toLowerCase());
+                              if (!navigationKeys.includes(event.key) && !copyOrSelect) {
+                                event.preventDefault();
                               }
                             }}
-                            onBlur={(event) => {
+                            onBeforeInput={(event) => event.preventDefault()}
+                            onPaste={(event) => event.preventDefault()}
+                            onCut={(event) => event.preventDefault()}
+                            onDrop={(event) => event.preventDefault()}
+                            onChange={(event) =>
                               updateTournamentField(
                                 activeTournament.id,
                                 "bustoutCount",
                                 event.target.value,
-                              );
-                              flushTournamentFieldUpdates();
-                              setEntryCountDrafts((drafts) => {
-                                const nextDrafts = {
-                                  ...drafts[activeTournament.id],
-                                };
-                                delete nextDrafts.bustoutCount;
-                                return {
-                                  ...drafts,
-                                  [activeTournament.id]: nextDrafts,
-                                };
-                              });
-                            }}
+                              )
+                            }
+                            onBlur={flushTournamentFieldUpdates}
                           />
                         </label>
                         <button
@@ -1675,7 +1650,7 @@ function App() {
             />
             <h1>DinkyDonk</h1>
             <h2>Version {APP_VERSION}</h2>
-            <p>DinkyDonk is Free and Open-Source software distributed under the GNU GPL3 License.</p>
+            <p>DinkyDonk is Free and Open-Source software distributed under the GNU AGPL-3.0-or-later license.</p>
             <p>Copyright © 2026 Brian Sayles</p>
             <div className="app-splash-loader" aria-hidden="true">
               <span />
