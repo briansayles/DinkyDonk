@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Joyride, STATUS } from "react-joyride";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { downloadDir } from "@tauri-apps/api/path";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   createNextLevel,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
@@ -28,6 +29,7 @@ import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
 import { useTournaments } from "./features/tournaments/useTournaments";
 import AboutPanel from "./features/about/AboutPanel";
+import { checkForNewRelease, releasesPageUrl } from "./features/about/releaseCheck";
 import CurrencyInput from "./components/CurrencyInput";
 import SettingsPanel from "./features/settings/SettingsPanel";
 import { useTimerSettings } from "./features/settings/useTimerSettings";
@@ -89,6 +91,8 @@ function App() {
   const [tablesCollapsed, setTablesCollapsed] = useState(false);
   const [tournamentExportError, setTournamentExportError] = useState("");
   const [tournamentExportNotice, setTournamentExportNotice] = useState("");
+  const [newRelease, setNewRelease] = useState(null);
+  const [releaseLinkError, setReleaseLinkError] = useState("");
   const tournamentState = useTournaments();
   const {
     activeTournament,
@@ -130,6 +134,25 @@ function App() {
     timerSettingsError,
     timerSettingsLoaded,
   } = useTimerSettings(loadTournaments, flushTournamentFieldUpdates);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
+    checkForNewRelease(APP_VERSION, controller.signal)
+      .then((version) => {
+        if (active) setNewRelease(version);
+      })
+      .catch((error) => {
+        if (active) console.error("Could not check for a new version.", error);
+      })
+      .finally(() => window.clearTimeout(timeoutId));
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(
@@ -833,6 +856,33 @@ function App() {
           Take a tour
         </button>
       </header>
+
+      {newRelease && (
+        <div className="release-notice" role="status">
+          <span>
+            DinkyDonk v{newRelease} is available.{" "}
+            <a
+              href={releasesPageUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => {
+                if (!isTauri()) return;
+                event.preventDefault();
+                openUrl(releasesPageUrl).catch((error) => {
+                  console.error("Could not open the releases page.", error);
+                  setReleaseLinkError("Could not open the releases page. Visit github.com/briansayles/DinkyDonk/releases in your browser.");
+                });
+              }}
+            >
+              View downloads
+            </a>
+            {releaseLinkError && <span role="alert"> {releaseLinkError}</span>}
+          </span>
+          <button type="button" onClick={() => setNewRelease(null)} aria-label="Dismiss update notification">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <Joyride
         onEvent={handleUserTourCallback}

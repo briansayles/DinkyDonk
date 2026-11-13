@@ -34,6 +34,7 @@
 - **Bustout payouts:** Each bustout's `payout` follows the current paytable for its recorded place, including manual overrides. Unpaid places receive zero.
 - **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed.
 - **Keep-awake support:** Keep the display and system awake while the timer is visible.
+- **Update notifications:** At startup, the app checks GitHub for a newer published release and offers a link to the downloads page. Updates are installed manually; an unavailable connection does not prevent the app from starting.
 
 ## History
 

@@ -78,6 +78,22 @@
   justify-self: end;
 }
 
+.release-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #39875b;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.release-notice a {
+  text-decoration: underline;
+}
+
 .app-splash {
   position: fixed;
   z-index: 20000;
