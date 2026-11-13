@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { sortChips, sortLevels, updateBustoutPayouts } from "../../domain/tournament";
+import { DEFAULT_MAX_PLAYERS_PER_TABLE, normalizeMaxPlayersPerTable, sortChips, sortLevels, updateBustoutPayouts } from "../../domain/tournament";
 import {
   getTournamentEndBustoutCount,
   getTournamentEndTimerState,
@@ -264,11 +264,8 @@ export function useTournaments() {
             }),
       };
     } else if (field === "maxPlayersPerTable") {
-      const parsedValue = Number(value);
       updatedFields = {
-        [field]: Number.isFinite(parsedValue)
-          ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedValue)))
-          : 0,
+        [field]: normalizeMaxPlayersPerTable(value),
       };
     } else if (field === "otherPrizePool" || field === "otherChipstack") {
       const parsedValue = Number(value);
@@ -349,7 +346,7 @@ export function useTournaments() {
       bustouts: [],
       payoutPlaces: 0,
       payouts: [],
-      maxPlayersPerTable: source.maxPlayersPerTable ?? 0,
+      maxPlayersPerTable: normalizeMaxPlayersPerTable(source.maxPlayersPerTable),
       timerIsRunning: false,
       timerStartedAt: null,
       timerElapsedMs: 0,
@@ -588,10 +585,7 @@ export function useTournaments() {
       return;
     }
 
-    const parsedValue = Number(value);
-    const maxPlayersPerTable = Number.isFinite(parsedValue)
-      ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedValue)))
-      : 0;
+    const maxPlayersPerTable = normalizeMaxPlayersPerTable(value);
     const nextTournaments = tournaments.map((tournament) =>
       tournament.id === tournamentId
         ? { ...tournament, maxPlayersPerTable }
@@ -612,7 +606,7 @@ export function useTournaments() {
       return;
     }
 
-    await updateMaxPlayersPerTable(activeTournament.id, "0");
+    await updateMaxPlayersPerTable(activeTournament.id, DEFAULT_MAX_PLAYERS_PER_TABLE);
   }
 
   return {

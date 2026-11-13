@@ -54,6 +54,13 @@ test("tournament CSV exports include the structure and recorded results", () => 
   assert.ok(exports.results.includes('"Remaining Players","1"'));
 });
 
+test("structure exports report the effective table limit for zero values", () => {
+  const zero = createTournamentCsvExports({ maxPlayersPerTable: 0 }).structure;
+  const explicit = createTournamentCsvExports({ maxPlayersPerTable: 6 }).structure;
+  assert.ok(zero.includes('"Max Players Per Table","9"'));
+  assert.ok(explicit.includes('"Max Players Per Table","6"'));
+});
+
 test("results summarize entry costs, contributions, and totals", () => {
   const tournament = {
     buyins: Array.from({ length: 3 }, () => ({ name: "Unnamed" })),

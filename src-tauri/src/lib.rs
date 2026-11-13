@@ -186,7 +186,7 @@ struct Tournament {
     payout_model: String,
     #[serde(default = "default_allow_payout_override")]
     allow_payout_override: bool,
-    #[serde(default)]
+    #[serde(default = "default_max_players_per_table")]
     max_players_per_table: u32,
     #[serde(default)]
     chips: Vec<TournamentChip>,
@@ -213,6 +213,10 @@ fn default_payout_model() -> String {
 
 fn default_allow_payout_override() -> bool {
     true
+}
+
+fn default_max_players_per_table() -> u32 {
+    9
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -321,7 +325,7 @@ fn default_tournament_structure() -> Tournament {
         percent_paid: default_percent_paid(),
         payout_model: default_payout_model(),
         allow_payout_override: default_allow_payout_override(),
-        max_players_per_table: 0,
+        max_players_per_table: default_max_players_per_table(),
         chips,
         levels,
         timer_is_running: false,
@@ -1266,6 +1270,7 @@ mod tests {
         assert!(!tournament.addons_allowed);
         assert_eq!(tournament.percent_paid, 20.0);
         assert_eq!(tournament.payout_model, "Standard");
+        assert_eq!(tournament.max_players_per_table, 9);
         assert_eq!(
             tournament
                 .chips
@@ -1330,5 +1335,14 @@ mod tests {
                 (Some(15.0), Some(100.0), Some(200.0), Some(0.0)),
             ]
         );
+    }
+
+    #[test]
+    fn missing_table_limit_defaults_to_nine() {
+        let tournament = super::default_tournament_structure();
+        let mut json = serde_json::to_value(tournament).unwrap();
+        json.as_object_mut().unwrap().remove("maxPlayersPerTable");
+        let loaded: super::Tournament = serde_json::from_value(json).unwrap();
+        assert_eq!(loaded.max_players_per_table, 9);
     }
 }

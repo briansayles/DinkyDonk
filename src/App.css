@@ -727,7 +727,7 @@
   min-height: 0;
   flex-direction: column;
   justify-content: flex-start;
-  gap: clamp(0.35rem, 1vh, 0.75rem);
+  gap: clamp(0.2rem, 0.5vh, 0.375rem);
   overflow-y: auto;
   padding: 0.5rem;
   font-variant-numeric: tabular-nums;
@@ -735,22 +735,26 @@
   scrollbar-width: thin;
 }
 
-.timer-entry-column::-webkit-scrollbar {
+.timer-entry-column::-webkit-scrollbar,
+.timer-payout-table tbody::-webkit-scrollbar {
   width: 0.5rem;
 }
 
-.timer-entry-column::-webkit-scrollbar-track {
+.timer-entry-column::-webkit-scrollbar-track,
+.timer-payout-table tbody::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.timer-entry-column::-webkit-scrollbar-thumb {
+.timer-entry-column::-webkit-scrollbar-thumb,
+.timer-payout-table tbody::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.28);
   background-clip: padding-box;
 }
 
-.timer-entry-column::-webkit-scrollbar-thumb:hover {
+.timer-entry-column::-webkit-scrollbar-thumb:hover,
+.timer-payout-table tbody::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.46);
   background-clip: padding-box;
 }
@@ -761,29 +765,28 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: clamp(0.35rem, 1vh, 0.75rem);
+  gap: clamp(0.2rem, 0.5vh, 0.375rem);
 }
 
 .timer-bustout-controls,
 .timer-payout-controls {
-  margin-top: 0.375em;
+  margin-top: 0.15em;
 }
 
-.timer-payout-section {
-  order: 1;
+.timer-payout-controls {
+  min-height: 5rem;
 }
 
-.timer-bustout-section {
-  order: 2;
+.timer-payout-controls:has(tbody) {
+  min-height: 7.75rem;
 }
 
 .timer-tables-controls {
-  order: 3;
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: clamp(0.35rem, 1vh, 0.75rem);
-  margin-top: 0.375em;
+  gap: clamp(0.2rem, 0.5vh, 0.375rem);
+  margin-top: 0.15em;
 }
 
 .timer-entry-heading {
@@ -791,7 +794,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding-bottom: 0.35rem;
+  padding-bottom: 0.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
 
@@ -825,7 +828,7 @@
 .timer-payout-controls,
 .timer-tables-controls {
   border-top: 3px solid rgba(255, 255, 255, 0.8);
-  padding-top: 0.5rem;
+  padding-top: 0.25rem;
 }
 
 .timer-entry-table {
@@ -839,7 +842,7 @@
 
 .timer-entry-table th,
 .timer-entry-table td {
-  padding: 0.25rem 0.15rem;
+  padding: 0.125rem 0.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
@@ -899,7 +902,7 @@
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: 0.2rem;
+  padding: 0.1rem 0.2rem;
   margin: 0;
   font-size: inherit;
   text-align: right;
@@ -912,7 +915,7 @@
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0.2rem;
+  padding: 0.1rem 0.2rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -935,7 +938,7 @@
 .timer-payout-places input,
 .timer-payout-table input {
   min-width: 0;
-  padding: 0.2rem;
+  padding: 0.1rem 0.2rem;
   font-size: inherit;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -945,13 +948,53 @@
   width: 4.5rem;
 }
 
+.timer-payout-table-scroll {
+  display: flex;
+  min-height: 1.5rem;
+  overflow: hidden;
+}
+
+.timer-payout-table-scroll:has(tbody) {
+  min-height: 4.5rem;
+}
+
 .timer-payout-table {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
   width: 100%;
   table-layout: fixed;
   border-collapse: collapse;
   font-size: clamp(0.65rem, 1.6vh, 0.95rem);
   text-align: left;
   color: rgba(255, 255, 255, 0.5);
+}
+
+.timer-payout-table thead,
+.timer-payout-table tbody,
+.timer-payout-table tfoot {
+  display: block;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.timer-payout-table thead,
+.timer-payout-table tfoot {
+  flex-shrink: 0;
+  overflow-y: hidden;
+}
+
+.timer-payout-table tbody {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+.timer-payout-table tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
 .timer-tables-table {
@@ -965,7 +1008,7 @@
 
 .timer-tables-table th,
 .timer-tables-table td {
-  padding: 0.25rem 0.15rem;
+  padding: 0.125rem 0.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
@@ -997,7 +1040,7 @@
 
 .timer-bustout-table th,
 .timer-bustout-table td {
-  padding: 0.25rem 0.15rem;
+  padding: 0.125rem 0.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
@@ -1047,7 +1090,7 @@
   display: block;
   width: calc(100% - 0.4rem);
   min-width: 0;
-  padding: 0.2rem;
+  padding: 0.1rem 0.2rem;
   margin: 0 auto 0 0;
   font-size: inherit;
   text-align: left;
@@ -1056,7 +1099,7 @@
 
 .timer-payout-table th,
 .timer-payout-table td {
-  padding: 0.25rem 0.15rem;
+  padding: 0.125rem 0.15rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.25);
 }
 
@@ -1432,7 +1475,7 @@
 
 .timer-message {
   position: absolute;
-  top: calc(72% + 1em);
+  top: calc(72% + 0.8em);
   left: 50%;
   z-index: 2;
   display: grid;
@@ -1445,7 +1488,7 @@
   border-radius: 0.5rem;
   /* background-color: rgba(0, 0, 0, 0.10); */
   transform: translate(-50%, -50%);
-  font-size: clamp(3rem, min(12cqi, 5.76vh, 4.32rem), 9rem);
+  font-size: clamp(3.75rem, min(15cqi, 7.2vh, 5.4rem), 11.25rem);
   font-weight: 600;
   line-height: 1.15;
   text-align: center;

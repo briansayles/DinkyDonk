@@ -11,6 +11,7 @@ export const MAX_EDGE_SPOT_QUANTITY = 12;
 export const DEFAULT_PERCENT_PAID = 20;
 export const DEFAULT_PAYOUT_MODEL = "Standard";
 export const DEFAULT_ALLOW_PAYOUT_OVERRIDE = true;
+export const DEFAULT_MAX_PLAYERS_PER_TABLE = 9;
 export const PAYOUT_MODELS = ["Standard", "Flat", "Steep"];
 export const PAYOUT_MODEL_CONSTANTS = {
   Standard: {
@@ -30,6 +31,7 @@ export const PAYOUT_MODEL_CONSTANTS = {
   },
 };
 export const PAYOUT_ROUND_TO_TABLE = [
+  { minPayout: 0, roundTo: 1 },
   { minPayout: 5, roundTo: 1 },
   { minPayout: 10, roundTo: 5 },
   { minPayout: 20, roundTo: 5 },
@@ -228,7 +230,7 @@ export function calculateDefaultPayouts({
 }
 
 export function getEffectivePayouts({
-  totalEntries,
+  playerCount,
   totalPrizePool,
   percentPaid = DEFAULT_PERCENT_PAID,
   payoutModel = DEFAULT_PAYOUT_MODEL,
@@ -238,7 +240,7 @@ export function getEffectivePayouts({
 }) {
   const defaultPayoutPlaces = Math.max(
     1,
-    Math.round((totalEntries * Number(percentPaid)) / 100),
+    Math.round((playerCount * Number(percentPaid)) / 100),
   );
   const parsedPlaces = Number(payoutPlaces);
   const overridePlaces = Number.isFinite(parsedPlaces)
@@ -288,6 +290,14 @@ export function getEntryContributions(count, cost, chipstack) {
   };
 }
 
+export function normalizeMaxPlayersPerTable(value) {
+  const parsedValue = Number(value);
+  const count = Number.isFinite(parsedValue)
+    ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedValue)))
+    : 0;
+  return count || DEFAULT_MAX_PLAYERS_PER_TABLE;
+}
+
 export function updateBustoutPayouts(tournament) {
   if (!tournament.bustouts?.length) {
     return tournament;
@@ -301,12 +311,12 @@ export function updateBustoutPayouts(tournament) {
       ? [{ count: tournament.addons?.length ?? 0, cost: tournament.addonCost }]
       : []),
   ];
-  const totalEntries = counts.reduce((total, entry) => total + entry.count, 0);
+  const playerCount = tournament.buyins?.length ?? 0;
   const totalPrizePool = counts.reduce(
     (total, entry) => total + entry.count * Number(entry.cost ?? 0),
     Number(tournament.otherPrizePool ?? 0),
   );
-  const { payouts } = getEffectivePayouts({ ...tournament, totalEntries, totalPrizePool });
+  const { payouts } = getEffectivePayouts({ ...tournament, playerCount, totalPrizePool });
   let changed = false;
   const bustouts = tournament.bustouts.map((bustout) => {
     const payout = Number.isInteger(bustout.place) && bustout.place > 0

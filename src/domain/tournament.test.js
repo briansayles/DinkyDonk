@@ -1,6 +1,14 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, sortLevels, updateBustoutPayouts } from "./tournament.js";
+import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, normalizeMaxPlayersPerTable, sortLevels, updateBustoutPayouts } from "./tournament.js";
+
+test("zero and missing table limits use nine while explicit limits are retained", () => {
+  assert.equal(normalizeMaxPlayersPerTable(0), 9);
+  assert.equal(normalizeMaxPlayersPerTable("0"), 9);
+  assert.equal(normalizeMaxPlayersPerTable(undefined), 9);
+  assert.equal(normalizeMaxPlayersPerTable(6), 6);
+  assert.equal(normalizeMaxPlayersPerTable("12"), 12);
+});
 
 test("paid-player timer message requires entries or an edited paytable", () => {
   const empty = {
@@ -225,6 +233,52 @@ test("per-player stack matches the displayed total even with unused chips", () =
   assert.equal(chipStackMatchesStarting([{ denomination: 25, quantityPerPlayer: 0 }], "0"), true);
 });
 
+test("calculated payouts use the player count while preserving manual overrides", () => {
+  const options = {
+    playerCount: 38,
+    totalPrizePool: 1010,
+    percentPaid: 20,
+    payoutModel: "Standard",
+  };
+  const calculated = getEffectivePayouts(options);
+  assert.equal(calculated.defaultPayoutPlaces, 8);
+  assert.equal(calculated.effectivePayoutPlaces, 8);
+  assert.deepEqual(calculated.payouts, [340, 220, 150, 105, 75, 55, 40, 25]);
+  const overridden = getEffectivePayouts({ ...options, payoutPlaces: 2, payouts: [600, 410] });
+  assert.equal(overridden.defaultPayoutPlaces, 8);
+  assert.equal(overridden.effectivePayoutPlaces, 2);
+  assert.deepEqual(overridden.payouts, [600, 410]);
+});
+
+test("small minimum payouts do not invalidate the entire calculated paytable", () => {
+  const { payouts } = getEffectivePayouts({
+    playerCount: 100,
+    totalPrizePool: 2000,
+    percentPaid: 20,
+    payoutModel: "Standard",
+  });
+  assert.equal(payouts.length, 20);
+  assert.ok(payouts[0] > 0);
+  assert.equal(payouts.reduce((sum, amount) => sum + amount, 0), 2000);
+});
+
+test("bustout payouts count buy-ins as players and add-ons toward the pool", () => {
+  const tournament = {
+    buyins: Array.from({ length: 38 }, () => ({})),
+    addons: Array.from({ length: 50 }, () => ({})),
+    rebuys: [],
+    addonsAllowed: true,
+    rebuysAllowed: false,
+    buyinCost: 20,
+    addonCost: 5,
+    percentPaid: 20,
+    payoutModel: "Standard",
+    allowPayoutOverride: false,
+    bustouts: [{ place: 8 }, { place: 9 }],
+  };
+  assert.deepEqual(updateBustoutPayouts(tournament).bustouts.map((item) => item.payout), [25, 0]);
+});
+
 test("bustout payouts follow the effective calculated and overridden paytable", () => {
   const tournament = {
     buyins: Array.from({ length: 10 }, () => ({})),
@@ -244,7 +298,7 @@ test("bustout payouts follow the effective calculated and overridden paytable", 
     bustouts: [{ place: 2 }, { place: 4 }, { place: null }],
   };
   const calculated = getEffectivePayouts({
-    ...tournament, totalEntries: 12, totalPrizePool: 250,
+    ...tournament, playerCount: 10, totalPrizePool: 250,
   }).payouts;
   const initial = updateBustoutPayouts(tournament);
   assert.deepEqual(initial.bustouts.map((item) => item.payout), [calculated[1], 0, null]);

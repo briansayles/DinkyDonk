@@ -1,4 +1,4 @@
-import { getEntryContributions } from "./tournament.js";
+import { getEntryContributions, normalizeMaxPlayersPerTable } from "./tournament.js";
 
 const structureColumns = [
   "Section",
@@ -136,7 +136,7 @@ export function createTournamentCsvExports(tournament) {
     settingRow("Percent Paid", tournament.percentPaid),
     settingRow("Payout Model", tournament.payoutModel),
     settingRow("Allow Payout Override", tournament.allowPayoutOverride),
-    settingRow("Max Players Per Table", tournament.maxPlayersPerTable),
+    settingRow("Max Players Per Table", normalizeMaxPlayersPerTable(tournament.maxPlayersPerTable)),
     ...chips.map((chip, index) => ({
       Section: "Chip",
       Index: index + 1,

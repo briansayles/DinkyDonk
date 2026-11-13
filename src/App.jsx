@@ -13,6 +13,7 @@ import {
   getEffectivePayouts,
   getPayoutTimerMessage,
   normalizeEdgeSpotQuantity,
+  normalizeMaxPlayersPerTable,
   sortChips,
   sortLevels,
 } from "./domain/tournament";
@@ -522,7 +523,7 @@ function App() {
       bustouts: existingTournament?.bustouts ?? [],
       payoutPlaces: existingTournament?.payoutPlaces ?? 0,
       payouts: existingTournament?.payouts ?? [],
-      maxPlayersPerTable: existingTournament?.maxPlayersPerTable ?? 0,
+      maxPlayersPerTable: normalizeMaxPlayersPerTable(existingTournament?.maxPlayersPerTable),
       timerIsRunning: existingTournament?.timerIsRunning ?? false,
       timerStartedAt: existingTournament?.timerStartedAt ?? null,
       timerElapsedMs: existingTournament?.timerElapsedMs ?? 0,
@@ -658,20 +659,10 @@ function App() {
     0,
     startingPlayers - bustoutCount,
   );
-  const parsedMaxPlayersPerTable = activeTournament
-    ? Number(
-        tableMaxDrafts[activeTournament.id] ??
-          activeTournament.maxPlayersPerTable ??
-          0,
-      )
-    : 0;
-  const maxPlayersPerTable = Number.isFinite(parsedMaxPlayersPerTable)
-    ? Math.min(4_294_967_295, Math.max(0, Math.floor(parsedMaxPlayersPerTable)))
-    : 0;
-  const requiredTableCount =
-    maxPlayersPerTable > 0
-      ? Math.ceil(remainingPlayers / maxPlayersPerTable)
-      : 0;
+  const maxPlayersPerTable = normalizeMaxPlayersPerTable(
+    tableMaxDrafts[activeTournament?.id] ?? activeTournament?.maxPlayersPerTable,
+  );
+  const requiredTableCount = Math.ceil(remainingPlayers / maxPlayersPerTable);
   const largerTableSize =
     requiredTableCount > 0
       ? Math.ceil(remainingPlayers / requiredTableCount)
@@ -738,7 +729,7 @@ function App() {
     defaultPayouts,
     payouts,
   } = getEffectivePayouts({
-    totalEntries,
+    playerCount: startingPlayers,
     totalPrizePool,
     percentPaid,
     payoutModel: activeTournament?.payoutModel ?? DEFAULT_PAYOUT_MODEL,
@@ -1393,6 +1384,100 @@ function App() {
                       </tfoot>
                     </table>
                   </div>
+                  <div className="timer-tables-controls">
+                    <div className="timer-entry-heading">
+                      <h3>Tables</h3>
+                      <div className="timer-entry-heading-actions">
+                        <label className="timer-payout-places">
+                          <span>Max/Table</span>
+                          <input
+                            data-tour="timer-tables-max"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={
+                              tableMaxDrafts[activeTournament.id] ??
+                              normalizeMaxPlayersPerTable(activeTournament.maxPlayersPerTable)
+                            }
+                            aria-label="Maximum players per table"
+                            onChange={(event) => {
+                              setTableMaxDrafts((drafts) => ({
+                                ...drafts,
+                                [activeTournament.id]: event.target.value,
+                              }));
+                              updateTournamentField(
+                                activeTournament.id,
+                                "maxPlayersPerTable",
+                                event.target.value,
+                              );
+                            }}
+                            onBlur={() => {
+                              flushTournamentFieldUpdates();
+                              setTableMaxDrafts((drafts) => {
+                                const nextDrafts = { ...drafts };
+                                delete nextDrafts[activeTournament.id];
+                                return nextDrafts;
+                              });
+                            }}
+                          />
+                        </label>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() => resetTables(activeTournament)}
+                          disabled={saving}
+                          aria-label="Reset tables"
+                          title="Reset tables"
+                        >
+                          <TimerIcon name="reset" />
+                        </button>
+                        <button
+                          className="timer-entry-reset"
+                          type="button"
+                          onClick={() =>
+                            setTablesCollapsed((collapsed) => !collapsed)
+                          }
+                          aria-expanded={!tablesCollapsed}
+                          aria-controls="timer-tables-table"
+                          aria-label={
+                            tablesCollapsed ? "Expand tables" : "Collapse tables"
+                          }
+                          title={
+                            tablesCollapsed ? "Expand tables" : "Collapse tables"
+                          }
+                        >
+                          <TimerIcon
+                            name={tablesCollapsed ? "expand" : "collapse"}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <table className="timer-tables-table" id="timer-tables-table">
+                      {!tablesCollapsed && <tbody>
+                        {tableRows.map((row, index) => (
+                          <tr key={index}>
+                            <td className="timer-tables-description">
+                              {row.count > 0
+                                ? `${row.count.toLocaleString()} ${
+                                    row.count === 1 ? "Table" : "Tables"
+                                  } of ${row.playersPerTable?.toLocaleString()}`
+                                : "—"}
+                            </td>
+                            <td>{row.total.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>}
+                      <tfoot>
+                        <tr>
+                          <th scope="row">
+                            {totalTableCount.toLocaleString()}{" "}
+                            {totalTableCount === 1 ? "Table" : "Tables"}
+                          </th>
+                          <td>{totalPlayersAtTables.toLocaleString()}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
                   <div className="timer-payout-controls timer-payout-section">
                     <div className="timer-entry-heading">
                       <h3>Payouts</h3>
@@ -1474,6 +1559,11 @@ function App() {
                         </button>
                       </div>
                     </div>
+                    <div
+                      className="timer-payout-table-scroll"
+                      role="region"
+                      aria-label="Payout table"
+                    >
                     <table
                       className="timer-payout-table"
                       id="timer-payout-table"
@@ -1499,7 +1589,7 @@ function App() {
                           <th scope="col">Payout</th>
                         </tr>
                       </thead>}
-                      {!payoutsCollapsed && <tbody>
+                      {!payoutsCollapsed && <tbody tabIndex={0}>
                         {payouts.map((payout, index) => (
                           <tr key={index}>
                             <th scope="row">{index + 1}</th>
@@ -1570,101 +1660,7 @@ function App() {
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
-                  <div className="timer-tables-controls">
-                    <div className="timer-entry-heading">
-                      <h3>Tables</h3>
-                      <div className="timer-entry-heading-actions">
-                        <label className="timer-payout-places">
-                          <span>Max/Table</span>
-                          <input
-                            data-tour="timer-tables-max"
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={
-                              tableMaxDrafts[activeTournament.id] ??
-                              activeTournament.maxPlayersPerTable ??
-                              0
-                            }
-                            aria-label="Maximum players per table"
-                            onChange={(event) => {
-                              setTableMaxDrafts((drafts) => ({
-                                ...drafts,
-                                [activeTournament.id]: event.target.value,
-                              }));
-                              updateTournamentField(
-                                activeTournament.id,
-                                "maxPlayersPerTable",
-                                event.target.value,
-                              );
-                            }}
-                            onBlur={() => {
-                              flushTournamentFieldUpdates();
-                              setTableMaxDrafts((drafts) => {
-                                const nextDrafts = { ...drafts };
-                                delete nextDrafts[activeTournament.id];
-                                return nextDrafts;
-                              });
-                            }}
-                          />
-                        </label>
-                        <button
-                          className="timer-entry-reset"
-                          type="button"
-                          onClick={() => resetTables(activeTournament)}
-                          disabled={saving}
-                          aria-label="Reset tables"
-                          title="Reset tables"
-                        >
-                          <TimerIcon name="reset" />
-                        </button>
-                        <button
-                          className="timer-entry-reset"
-                          type="button"
-                          onClick={() =>
-                            setTablesCollapsed((collapsed) => !collapsed)
-                          }
-                          aria-expanded={!tablesCollapsed}
-                          aria-controls="timer-tables-table"
-                          aria-label={
-                            tablesCollapsed ? "Expand tables" : "Collapse tables"
-                          }
-                          title={
-                            tablesCollapsed ? "Expand tables" : "Collapse tables"
-                          }
-                        >
-                          <TimerIcon
-                            name={tablesCollapsed ? "expand" : "collapse"}
-                          />
-                        </button>
-                      </div>
                     </div>
-                    <table className="timer-tables-table" id="timer-tables-table">
-                      {!tablesCollapsed && <tbody>
-                        {tableRows.map((row, index) => (
-                          <tr key={index}>
-                            <td className="timer-tables-description">
-                              {row.count > 0
-                                ? `${row.count.toLocaleString()} ${
-                                    row.count === 1 ? "Table" : "Tables"
-                                  } of ${row.playersPerTable?.toLocaleString()}`
-                                : "—"}
-                            </td>
-                            <td>{row.total.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                      </tbody>}
-                      <tfoot>
-                        <tr>
-                          <th scope="row">
-                            {totalTableCount.toLocaleString()}{" "}
-                            {totalTableCount === 1 ? "Table" : "Tables"}
-                          </th>
-                          <td>{totalPlayersAtTables.toLocaleString()}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
                   </div>
                   </div>
                 </TimerPanel>
