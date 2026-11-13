@@ -1,4 +1,6 @@
-# Dinky Donk VERSION - DESCRIPTION
+## Project's Homepage and GitHub Repository
+[DinkyDonk Poker Tournament Manager and Timer](https://briansayles.github.io/DinkyDonk/)
+[DinkyDonk Poker Tournament Manager and Timer on GitHub](https://github.com/briansayles/DinkyDonk/)
 
 ## What's New
 - 
