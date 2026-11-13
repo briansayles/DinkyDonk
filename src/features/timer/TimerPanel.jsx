@@ -366,9 +366,10 @@ export default function TimerPanel({
           nextLevel.level.bigBlind,
           nextLevel.level.ante,
         );
+  const isPaused = currentLevel && startedAt === null;
 
   return (
-    <div className="timer-display">
+    <div className={`timer-display${isPaused ? " timer-display-paused" : ""}`}>
       <div className="timer-current-blinds-row">
         <div className="timer-current-blinds-logo-slot">
           <img src="/dinkydonk-logo.png" alt="DinkyDonk" />
@@ -379,13 +380,20 @@ export default function TimerPanel({
           title="Double-click to edit the blinds schedule"
           onDoubleClick={() => onEditSection("edit-entry-levels")}
         >
-          <p className="timer-blinds" aria-hidden={!currentLevel}>
-            <AnimatedBlindValue
-              className="timer-blinds-value"
-              direction={blindsDirection}
-              value={currentBlindsText}
-            />
-          </p>
+          <div className="timer-current-blinds-content">
+            <p className="timer-blinds" aria-hidden={!currentLevel}>
+              <AnimatedBlindValue
+                className="timer-blinds-value"
+                direction={blindsDirection}
+                value={currentBlindsText}
+              />
+            </p>
+            {isPaused && (
+              <span className="timer-paused-indicator" role="status">
+                Timer Paused
+              </span>
+            )}
+          </div>
           <p className="timer-blinds-label">Current Blinds</p>
         </div>
         <div className="timer-current-blinds-qr-slot">
@@ -473,61 +481,63 @@ export default function TimerPanel({
       >
         {currentLevel ? (
           <div className={`timer-countdown timer-progress-${progressColor}`}>
-            <svg
-              className="timer-progress-ring"
-              viewBox="0 0 100 100"
-              aria-hidden="true"
-            >
-              <circle
-                className="timer-progress-track"
-                cx="50"
-                cy="50"
-                r="46"
-              />
-              <circle
-                className="timer-progress-value timer-progress-hours"
-                cx="50"
-                cy="50"
-                r="46"
-                style={{
-                  strokeDasharray: 289.03,
-                  strokeDashoffset: 289.03 * (1 - hourProgress),
-                }}
-              />
-              <circle
-                className="timer-progress-track"
-                cx="50"
-                cy="50"
-                r="42.6"
-              />
-              <circle
-                className="timer-progress-value timer-progress-minutes"
-                cx="50"
-                cy="50"
-                r="42.6"
-                style={{
-                  strokeDasharray: 267.66,
-                  strokeDashoffset: 267.66 * (1 - minuteProgress),
-                }}
-              />
-              <circle
-                className="timer-progress-track"
-                cx="50"
-                cy="50"
-                r="39.2"
-              />
-              <circle
-                className="timer-progress-value timer-progress-seconds"
-                cx="50"
-                cy="50"
-                r="39.2"
-                style={{
-                  strokeDasharray: 246.3,
-                  strokeDashoffset: 246.3 * (1 - secondProgress),
-                }}
-              />
-            </svg>
-            <TimerClock remainingMs={currentLevel.remainingMs} />
+            <div className="timer-countdown-visual">
+              <svg
+                className="timer-progress-ring"
+                viewBox="0 0 100 100"
+                aria-hidden="true"
+              >
+                <circle
+                  className="timer-progress-track"
+                  cx="50"
+                  cy="50"
+                  r="46"
+                />
+                <circle
+                  className="timer-progress-value timer-progress-hours"
+                  cx="50"
+                  cy="50"
+                  r="46"
+                  style={{
+                    strokeDasharray: 289.03,
+                    strokeDashoffset: 289.03 * (1 - hourProgress),
+                  }}
+                />
+                <circle
+                  className="timer-progress-track"
+                  cx="50"
+                  cy="50"
+                  r="42.6"
+                />
+                <circle
+                  className="timer-progress-value timer-progress-minutes"
+                  cx="50"
+                  cy="50"
+                  r="42.6"
+                  style={{
+                    strokeDasharray: 267.66,
+                    strokeDashoffset: 267.66 * (1 - minuteProgress),
+                  }}
+                />
+                <circle
+                  className="timer-progress-track"
+                  cx="50"
+                  cy="50"
+                  r="39.2"
+                />
+                <circle
+                  className="timer-progress-value timer-progress-seconds"
+                  cx="50"
+                  cy="50"
+                  r="39.2"
+                  style={{
+                    strokeDasharray: 246.3,
+                    strokeDashoffset: 246.3 * (1 - secondProgress),
+                  }}
+                />
+              </svg>
+              <TimerClock remainingMs={currentLevel.remainingMs} />
+            </div>
             <div className="timer-message" aria-live="polite">
               <span
                 key={activeTimerMessageIndex}

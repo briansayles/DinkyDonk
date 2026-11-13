@@ -267,6 +267,20 @@ export function getEffectivePayouts({
   };
 }
 
+export function getPayoutTimerMessage({
+  totalEntries,
+  effectivePayoutPlaces,
+  allowPayoutOverride,
+  payoutPlaces,
+  payouts,
+}) {
+  const paytableEdited =
+    allowPayoutOverride && (payoutPlaces > 0 || payouts.length > 0);
+  return effectivePayoutPlaces > 0 && (totalEntries > 0 || paytableEdited)
+    ? `Top ${effectivePayoutPlaces.toLocaleString()} Players Paid`
+    : "";
+}
+
 export function getEntryContributions(count, cost, chipstack) {
   return {
     contribution: count * Number(cost ?? 0),

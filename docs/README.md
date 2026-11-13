@@ -1,28 +1,10 @@
-> A fully-functional yet easy-to-use poker tournament timer and manager
-
+> A fully-functional, easy-to-use, free and open-source desktop poker tournament manager and timer built with Tauri, React and Vite
 <p align="center">
   <img src="assets/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
 </p>
 
-DinkyDonk is a free and open-source desktop poker tournament timer and manager built with Tauri, React, and Vite.
-
-## License
-
-Copyright (C) 2026 Brian Sayles.
-
-DinkyDonk is licensed under the [GNU Affero General Public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
-
-## Optional support
-
-If you find DinkyDonk useful, you can optionally support its author on [Buy Me a Coffee](https://www.buymeacoffee.com/briansayles):
-
-<p align="center">
-  <a href="https://www.buymeacoffee.com/briansayles">
-    <img src="assets/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
-  </a>
-</p>
-
 ## Screenshots
+
 <p>
     <img src="assets/Screenshot Timer 1.png" alt="Screenshot Timer 1" width="220">
     <img src="assets/Screenshot Timer 2.png" alt="Screenshot Timer 2" width="220">
@@ -34,10 +16,11 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
     <img src="assets/Screenshot Settings 1.png" alt="Screenshot Settings 1" width="220">
     <img src="assets/Screenshot Settings 2.png" alt="Screenshot Settings 2" width="220">    
 </p>
+
 ## Features
 
-- **Tournament timer:** Run timed blind levels and breaks, see current and upcoming blinds, and follow countdown progress. After the final scheduled level, the display stays at zero while elapsed time continues until paused or the tournament ends.
-- **Timer controls:** Play and pause, reset or restart a level, jump between levels, and use fullscreen mode.
+- **Tournament timer:** Run timed blind levels and breaks, see current and upcoming blinds, and follow countdown progress. The rotating message includes players paid once there are entries or an active paytable override. After the final scheduled level, the display stays at zero while elapsed time continues until paused or the tournament ends.
+- **Timer controls:** Play and pause, reset or restart a level, jump between levels, and use fullscreen mode. When paused, the blinds remain visible but faded, with a gently fading pause indicator over the current blinds.
 - **Chip display:** Track chips in use and animate color-ups: departing chips slide out before replacement chips slide in, while retained chips move into position. The direction reverses when moving back through levels.
 - **Shared-file updates:** Tournament structures, the active tournament, and timer preferences are stored together in a JSON file. Choose an existing `.json` file or enter a new filename to create a file containing the current settings. Existing files are opened rather than replaced. Multiple instances can share the same file on one or more computers, keeping their tournaments in sync. Volume controls can be adjusted per instance, and sounds can play alongside background music.
 - **Tournament structures:** Create and edit buy-in, rebuy, and add-on options; chip inventories; blind schedules; and players-per-table limits. Blind levels are sorted across breaks, which retain their positions. The editor highlights levels where either blind increases by less than 25% or more than 50% from the previous blind level.
@@ -52,16 +35,54 @@ If you find DinkyDonk useful, you can optionally support its author on [Buy Me a
 - **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed.
 - **Keep-awake support:** Keep the display and system awake while the timer is visible.
 
+## History
+
+This program's developer initially created SimpleTourneyManager back in 2009. That was developed as an Excel Add-In. Although that 'program' is known to still be in use by some, it's development ceased many years ago due to the complications of running Add-Ins for many.
+
+Since then, a handful of other timer/manager programs were developed using a variety of technologies, but none were offered to the public.
+
+Fast forward to 2026. Tools like React, Tauri, Vite, AI-assisted programming using GitHub Copilot, and remote builds using GitHub Actions make developing and delivering a cross-platform desktop program much simpler.
+
+Tinkering that started in early November, 2026 led to full-fledged development and the initial release of DinkyDonk a few days later, and subsequent releases on the following days.
+
+## What's in a Name?
+
+This program's developer plays poker (shocking, I know) with a  group of friends and acquantances who were mostly brought together by one person. Sadly, he left us way earlier than he should have. In our games, when our old tournament timer's alarm would go off, he would say "Dinky Donk! Dinky to the Donkey! The blinds are up, _____". Why? Not really sure. But it stuck and we all still say it today. So this program is named in his honor. We all miss you, Mike!
+
 ## Installation
 
 Visit the [Releases Page](https://github.com/briansayles/DinkyDonk/releases) to find and download the compiled version for your operating system.
 
-DinkyDonk is not (yet) a signed/trusted application on any platform. The full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk). As a result:
+## Running on Windows and macOS
 
-1. Your browser may complain when you try to download the app. You will likely need to acknowledge a warning message or two from your browser.
-2. On MacOS, you will need to remove the quarantine flag that MacOS will put on the file in order to run it. This can be done by running the following command in your terminal app:
+DinkyDonk is not yet code-signed on Windows and not yet notarized by Apple on macOS, so both may show a warning when you open the app for the first time.
 
+Windows: You may see a Windows Defender SmartScreen warning.
+
+Click "More info" → "Run anyway" to proceed.
+macOS: macOS may block the app the first time you open it. You can allow it in one of two ways:
+
+Go to System Settings → Privacy & Security, scroll down and click "Open Anyway" next to the DinkyDonk message. Then open the app again and confirm.
+Or run this command in the Terminal:
     ```xattr -dr com.apple.quarantine /Applications/DinkyDonk.app```
+
+Note that this project is open source, so the full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk).
+
+## Support Future Development
+
+If you find DinkyDonk useful, please consider supporting its author on [Buy Me a Coffee](https://www.buymeacoffee.com/briansayles). Any donation would be greatly appreciated and would help to fuel continued development.
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/briansayles">
+    <img src="assets/qr-code.png" alt="Scan to support DinkyDonk on Buy Me a Coffee" width="220">
+  </a>
+</p>
+
+## License
+
+Copyright (C) 2026 Brian Sayles.
+
+DinkyDonk is licensed under the [GNU Affero General assets License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
 
 ## Development
 

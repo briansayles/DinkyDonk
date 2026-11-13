@@ -1,6 +1,27 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, sortLevels, updateBustoutPayouts } from "./tournament.js";
+import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, sortLevels, updateBustoutPayouts } from "./tournament.js";
+
+test("paid-player timer message requires entries or an edited paytable", () => {
+  const empty = {
+    totalEntries: 0,
+    effectivePayoutPlaces: 1,
+    allowPayoutOverride: true,
+    payoutPlaces: 0,
+    payouts: [],
+  };
+  assert.equal(getPayoutTimerMessage(empty), "");
+  assert.equal(getPayoutTimerMessage({ ...empty, totalEntries: 1 }), "Top 1 Players Paid");
+  assert.equal(getPayoutTimerMessage({ ...empty, payoutPlaces: 1 }), "Top 1 Players Paid");
+  assert.equal(getPayoutTimerMessage({ ...empty, payouts: [0] }), "Top 1 Players Paid");
+  assert.equal(getPayoutTimerMessage({ ...empty, payouts: [25] }), "Top 1 Players Paid");
+  assert.equal(getPayoutTimerMessage({
+    ...empty, allowPayoutOverride: false, payoutPlaces: 1, payouts: [25],
+  }), "");
+  assert.equal(getPayoutTimerMessage({
+    ...empty, totalEntries: 1, effectivePayoutPlaces: 0,
+  }), "");
+});
 
 test("structure support counts buy-ins needed to reach ten final big blinds", () => {
   const levels = [

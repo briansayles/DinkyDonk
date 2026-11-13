@@ -10,6 +10,7 @@ import {
   formatCurrency,
   getEntryContributions,
   getEffectivePayouts,
+  getPayoutTimerMessage,
   normalizeEdgeSpotQuantity,
   sortChips,
   sortLevels,
@@ -724,21 +725,26 @@ function App() {
   });
   const timerMessages = [
     activeTournament?.name,
-    startingPlayers > 0
-      ? `Starting Players: ${startingPlayers.toLocaleString()}`
-      : "",
-    remainingPlayers > 0
-      ? `Remaining Players: ${remainingPlayers.toLocaleString()}`
-      : "",
     totalPrizePool > 0
       ? `Total Prize Pool: ${formatCurrency(totalPrizePool)}`
       : "",
+    getPayoutTimerMessage({
+      totalEntries,
+      effectivePayoutPlaces,
+      allowPayoutOverride,
+      payoutPlaces,
+      payouts: payoutValues,
+    }),
+    startingPlayers > 0
+      ? ` ${startingPlayers.toLocaleString()} Starting Players`
+      : "",
+    remainingPlayers > 0
+      ? ` ${remainingPlayers.toLocaleString()} Players Remaining`
+      : "",
     averageChipstack > 0
-      ? `Average Stack: ${averageChipstack.toLocaleString()}`
+      ? `Average ChipStack: ${averageChipstack.toLocaleString()}`
       : "",
-    effectivePayoutPlaces > 0
-      ? `Top ${effectivePayoutPlaces.toLocaleString()} Players Paid`
-      : "",
+
   ].filter(Boolean);
   const timer = useTimer({
     activeTab,
