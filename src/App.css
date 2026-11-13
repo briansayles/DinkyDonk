@@ -2037,9 +2037,13 @@
   margin-top: 1rem;
 }
 
-.tournament-level-statistics .chip-stack-value {
+.tournament-level-statistics .form-field {
   justify-content: flex-end;
-  text-align: right;
+}
+
+.tournament-level-statistics .chip-stack-value {
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .tournament-level-statistics .aggressiveness-value {

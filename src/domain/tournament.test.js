@@ -1,6 +1,30 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getStartingBigBlindMultiple, hasLargeLevelChange, hasSmallLevelChange, sortLevels, updateBustoutPayouts } from "./tournament.js";
+import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, sortLevels, updateBustoutPayouts } from "./tournament.js";
+
+test("structure support counts buy-ins needed to reach ten final big blinds", () => {
+  const levels = [
+    { bigBlind: 500 },
+    { isBreak: true },
+    { bigBlind: "10000" },
+    { isBreak: true, bigBlind: 0 },
+  ];
+  assert.equal(getStructureSupportedPlayers("10000", levels), 10);
+  assert.equal(getStructureSupportedPlayers(9000, levels), 12);
+  assert.equal(getStructureSupportedPlayers(200000, levels), 1);
+  assert.equal(getStructureSupportedPlayers(10000, [{ bigBlind: 10001 }]), 11);
+});
+
+test("structure support is unavailable without a valid stack and final blind", () => {
+  const levels = [{ bigBlind: 100 }];
+  for (const stack of ["", " ", null, 0, -1, "invalid", Infinity]) {
+    assert.equal(getStructureSupportedPlayers(stack, levels), null);
+  }
+  for (const bigBlind of ["", null, 0, -1, "invalid", Infinity]) {
+    assert.equal(getStructureSupportedPlayers(1000, [{ bigBlind: 100 }, { bigBlind }]), null);
+  }
+  assert.equal(getStructureSupportedPlayers(1000, [{ isBreak: true }]), null);
+});
 
 test("aggressiveness evaluation uses percentage-per-minute thresholds", () => {
   assert.equal(getAggressivenessEvaluation(0), "Slow");

@@ -426,6 +426,23 @@ export function getStartingBigBlindMultiple(startingChipstack, levels) {
   return Number.isFinite(multiple) ? multiple : null;
 }
 
+export function getStructureSupportedPlayers(startingChipstack, levels) {
+  const finalBigBlind = [...levels].reverse().find((level) => !level.isBreak)?.bigBlind;
+  if (
+    startingChipstack == null || String(startingChipstack).trim() === "" ||
+    finalBigBlind == null || String(finalBigBlind).trim() === ""
+  ) {
+    return null;
+  }
+  const stack = Number(startingChipstack);
+  const bigBlind = Number(finalBigBlind);
+  if (!Number.isFinite(stack) || stack <= 0 || !Number.isFinite(bigBlind) || bigBlind <= 0) {
+    return null;
+  }
+  const players = Math.ceil((10 * bigBlind) / stack);
+  return Number.isFinite(players) ? players : null;
+}
+
 export function getLevelStatistics(levels) {
   const blindLevels = levels.filter((level) => !level.isBreak);
   const parseNonNegative = (value) => {

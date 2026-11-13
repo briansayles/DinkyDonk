@@ -9,6 +9,7 @@ import {
   getLevelStatistics,
   getMaxChipSupportedPlayers,
   getStartingBigBlindMultiple,
+  getStructureSupportedPlayers,
   hasLargeLevelChange,
   hasSmallLevelChange,
   DEFAULT_EDGE_SPOT_QUANTITY,
@@ -51,6 +52,9 @@ export default function TournamentEditor({
 
   const startingBigBlindMultiple = draft
     ? getStartingBigBlindMultiple(draft.startingChipstack, draft.levels)
+    : null;
+  const structureSupportedPlayers = draft
+    ? getStructureSupportedPlayers(draft.startingChipstack, draft.levels)
     : null;
   const levelStatistics = draft ? getLevelStatistics(draft.levels) : null;
   const percentFormat = new Intl.NumberFormat(undefined, {
@@ -851,7 +855,18 @@ export default function TournamentEditor({
 
                 <div className="tournament-level-statistics">
                   <label className="form-field">
-                    Starting Stack in Multiples of Big Blind
+                    Structure Supports
+                    <output
+                      className="chip-stack-value"
+                      title="Minimum buy-ins needed for chips in play to reach 10 times the final big blind, without rebuys or add-ons."
+                    >
+                      {structureSupportedPlayers === null
+                        ? "Not set"
+                        : `${wholeNumberFormat.format(structureSupportedPlayers)} ${structureSupportedPlayers === 1 ? "player" : "players"}`}
+                    </output>
+                  </label>
+                  <label className="form-field">
+                    Starting Stack in Multiples of First Big Blind
                     <output
                       className={`chip-stack-value starting-blind-multiple${stackWarning ? " starting-blind-multiple-warning" : ""}`}
                       title={stackWarning}
