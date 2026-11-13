@@ -47,7 +47,7 @@ Tinkering that started in early November, 2026 led to full-fledged development a
 
 ## What's in a Name?
 
-This program's developer plays poker (shocking, I know) with a  group of friends and acquantances who were mostly brought together by one person. Sadly, he left us way earlier than he should have. In our games, when our old tournament timer's alarm would go off, he would say "Dinky Donk! Dinky to the Donkey! The blinds are up, _____". Why? Not really sure. But it stuck and we all still say it today. So this program is named in his honor. We all miss you, Mike!
+This program's developer plays poker (shocking, I know) with a  group of friends and acquaintances  who were mostly brought together by one person. Sadly, he left us way earlier than he should have. In our games, when our old tournament timer's alarm would go off, he would say "Dinky Donk! Dinky to the Donkey! The blinds are up, _____". Why? Not really sure. But it stuck and we all still say it today. So this program is named in his honor. We all miss you, Mike!
 
 ## Installation
 
@@ -55,18 +55,24 @@ Visit the [Releases Page](https://github.com/briansayles/DinkyDonk/releases) to 
 
 ## Running on Windows and macOS
 
-DinkyDonk is not yet code-signed on Windows and not yet notarized by Apple on macOS, so both may show a warning when you open the app for the first time.
+DinkyDonk is not yet code-signed on Windows and not yet notarized by Apple on macOS, so both may show a warning when you open the app for the first time. 
+Note that this project is open source, so the full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk) for you and anyone else to review.
 
-Windows: You may see a Windows Defender SmartScreen warning.
+### Windows
+
+You may see a Windows Defender SmartScreen warning.
 
 Click "More info" → "Run anyway" to proceed.
-macOS: macOS may block the app the first time you open it. You can allow it in one of two ways:
 
-Go to System Settings → Privacy & Security, scroll down and click "Open Anyway" next to the DinkyDonk message. Then open the app again and confirm.
-Or run this command in the Terminal:
-    ```xattr -dr com.apple.quarantine /Applications/DinkyDonk.app```
+### MacOS
 
-Note that this project is open source, so the full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk).
+MacOS may block the app the first time you open it. You can allow it in one of two ways:
+
+1. Go to System Settings → Privacy & Security, scroll down and click "Open Anyway" next to the DinkyDonk message. Then open the app again and confirm.
+2. Run this command in the Terminal:
+
+       xattr -dr com.apple.quarantine /Applications/DinkyDonk.app
+
 
 ## Support Future Development
 
@@ -78,22 +84,15 @@ If you find DinkyDonk useful, please consider supporting its author on [Buy Me a
   </a>
 </p>
 
-
-## Contributions are Welcome!
-
-I’m really grateful for any contributions you make to DinkyDonk! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request, your input helps shape the project and makes it better for everyone. Don’t hesitate to [open an issue]("https://github.com/briansayles/DinkyDonk/issues") or share your ideas.
-
-## License & Philosophy
+## License
 
 Copyright (C) 2026 Brian Sayles.
 
-This project is licensed under the **GNU Affero General Public License v3.0 or later(AGPL-3.0-or-later)**. I chose this license to ensure that DinkyDonk and any of its derivatives will always remain open-source and free for the community. It protects the project from being used in closed-source commercial software, ensuring that improvements benefit everyone.
-
-See the [LICENSE](LICENSE) file for more details.
+DinkyDonk is licensed under the [GNU Affero General public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
 
 ## Development
 
-If you want to build this application from the source code, you'll need to copy or fork the repo to your machine, install dependencies, then run the frontend development server:
+Install dependencies, then run the frontend development server:
 
 ```sh
 yarn install
