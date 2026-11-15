@@ -1,6 +1,192 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { chipStackMatchesStarting, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, normalizeMaxPlayersPerTable, sortLevels, updateBustoutPayouts } from "./tournament.js";
+import { chipStackMatchesStarting, createGuidedTournamentStructure, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, normalizeMaxPlayersPerTable, sortLevels, updateBustoutPayouts } from "./tournament.js";
+
+test("guided setup retains only template chips at or above the selected denomination", () => {
+  const chips = [
+    { denomination: 1, color: "white", quantityPerPlayer: 10 },
+    { denomination: 5, color: "red", quantityPerPlayer: 8 },
+    { denomination: 25, color: "green", quantityPerPlayer: 4 },
+    { denomination: 100, color: "black", quantityPerPlayer: 2 },
+  ];
+  const template = {
+    chips,
+    levels: [
+      { smallBlind: 300, bigBlind: 600, duration: 15 },
+      { smallBlind: 1000, bigBlind: 2000, duration: 15 },
+    ],
+  };
+  const answers = { smallestChip: 5, players: 10, durationHours: 1 };
+  assert.deepEqual(createGuidedTournamentStructure(template, answers).chips, chips.slice(1));
+  assert.deepEqual(createGuidedTournamentStructure(template, { ...answers, smallestChip: 6 }).chips, chips.slice(2));
+  assert.deepEqual(createGuidedTournamentStructure(template, { ...answers, smallestChip: 125 }).chips, []);
+  assert.equal(template.chips.length, 4);
+});
+
+test("guided setup extends the template progression across decades up to the big-blind limit", () => {
+  const template = {
+    levels: [
+      { smallBlind: 500, bigBlind: 1000, duration: 15, ante: 0 },
+      ...[1000, 1500, 2000, 3000, 4000, 5000, 7500].map((smallBlind) => ({
+        smallBlind, bigBlind: smallBlind * 2, duration: 15, ante: 10,
+      })),
+      { smallBlind: 10000, bigBlind: 20000, duration: 15, ante: 0 },
+    ],
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 500, players: 10, durationHours: 4,
+  });
+  assert.deepEqual(result.levels.map((level) => level.smallBlind), [
+    1000, 1500, 2000, 3000, 4000, 5000, 7500,
+    10000, 15000, 20000, 30000, 40000, 50000, 75000, 100000,
+  ]);
+  assert.equal(result.levels.at(-1).bigBlind, 200000);
+  assert.equal(result.levels.at(-1).ante, 1000);
+  assert.equal(result.levels.filter((level) => level.smallBlind === 10000).length, 1);
+  assert.ok(Math.abs(result.levels.reduce((sum, level) => sum + level.duration, 0) - 240) < 1e-10);
+  assert.equal(template.levels.length, 9);
+});
+
+test("guided setup extends to an exactly matching limit without adding levels above it", () => {
+  const template = {
+    levels: [1000, 1500, 2000, 3000, 4000, 5000, 7500].map((smallBlind) => ({
+      smallBlind, bigBlind: smallBlind * 2, duration: 15, ante: 0,
+    })),
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 500, players: 1, durationHours: 2,
+  });
+  assert.equal(result.levels.at(-1).smallBlind, 10000);
+  assert.equal(result.levels.at(-1).bigBlind, 20000);
+  assert.equal(result.levels.length, 8);
+});
+
+test("guided setup reports a missing progression when a higher schedule is needed", () => {
+  const template = { levels: [{ smallBlind: 300, bigBlind: 600, duration: 15 }] };
+  assert.throws(
+    () => createGuidedTournamentStructure(template, { smallestChip: 125, players: 10, durationHours: 1 }),
+    /must include a 1,000\/2,000 level/,
+  );
+});
+
+test("guided setup filters blind boundaries and assigns equal durations to levels and breaks", () => {
+  const template = {
+    name: "Template",
+    startingChipstack: 500,
+    levels: [
+      { smallBlind: 9, bigBlind: 18, duration: 10 },
+      { smallBlind: 10, bigBlind: 20, duration: 10 },
+      { isBreak: true, duration: 20 },
+      { smallBlind: 20, bigBlind: 400, duration: 30 },
+      { smallBlind: 30, bigBlind: 401, duration: 10 },
+    ],
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 5, players: 2, durationHours: 1.5,
+  });
+  assert.equal(result.startingChipstack, 2000);
+  assert.equal(result.name, "Template");
+  assert.deepEqual(result.levels.map((level) => [level.smallBlind, level.bigBlind, level.duration]), [
+    [10, 20, 30],
+    [undefined, undefined, 30],
+    [20, 400, 30],
+  ]);
+  assert.equal(template.levels.length, 5);
+  assert.equal(template.startingChipstack, 500);
+});
+
+test("guided durations round to equal whole minutes including the final level", () => {
+  const template = {
+    levels: [10, 20, 30].map((smallBlind) => ({
+      smallBlind, bigBlind: smallBlind * 2, duration: 15,
+    })),
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 1, players: 10, durationHours: 100 / 60,
+  });
+  assert.deepEqual(result.levels.map((level) => level.duration), [33, 33, 33]);
+  const roundedUp = createGuidedTournamentStructure(template, {
+    smallestChip: 1, players: 10, durationHours: 101 / 60,
+  });
+  assert.deepEqual(roundedUp.levels.map((level) => level.duration), [34, 34, 34]);
+});
+
+test("guided setup halves the starting stack and recalculates eligible levels below ten minutes", () => {
+  const template = {
+    levels: [2, 3, 4, 5, 10, 15, 20].map((smallBlind) => ({
+      smallBlind, bigBlind: smallBlind * 2, duration: 15,
+    })),
+  };
+  const answers = { smallestChip: 1, players: 1, durationHours: 63 / 60 };
+  const shortened = createGuidedTournamentStructure(template, answers);
+  assert.equal(shortened.startingChipstack, 200);
+  assert.deepEqual(shortened.levels.map((level) => level.bigBlind), [4, 6, 8, 10, 20]);
+  assert.deepEqual(shortened.levels.map((level) => level.duration), [13, 13, 13, 13, 13]);
+
+  const tenMinutes = createGuidedTournamentStructure(template, {
+    ...answers, durationHours: 66.5 / 60,
+  });
+  assert.equal(tenMinutes.startingChipstack, 400);
+  assert.equal(tenMinutes.levels.length, 7);
+  assert.ok(tenMinutes.levels.every((level) => level.duration === 10));
+
+  const veryShort = createGuidedTournamentStructure(template, {
+    ...answers, durationHours: 2 / 60,
+  });
+  assert.equal(veryShort.startingChipstack, 200);
+  assert.ok(veryShort.levels.every((level) => level.duration === 1));
+});
+
+test("guided setup recalculates extended levels using the halved stack", () => {
+  const template = {
+    levels: [1000, 1500, 2000, 3000, 4000, 5000, 7500].map((smallBlind) => ({
+      smallBlind, bigBlind: smallBlind * 2, duration: 15, ante: 0,
+    })),
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 500, players: 10, durationHours: 2,
+  });
+  assert.equal(result.startingChipstack, 100000);
+  assert.equal(result.levels.at(-1).bigBlind, 100000);
+  assert.equal(result.levels.length, 13);
+  assert.ok(result.levels.every((level) => level.duration === 9));
+});
+
+test("guided setup reports when halving cannot produce a whole-number stack", () => {
+  const template = {
+    levels: [{ smallBlind: 0.005, bigBlind: 0.01, duration: 15 }],
+  };
+  assert.throws(
+    () => createGuidedTournamentStructure(template, {
+      smallestChip: 0.0025, players: 10, durationHours: 1 / 60,
+    }),
+    /cannot be halved to a whole number/,
+  );
+});
+
+test("guided setup uses at least one minute for very short durations", () => {
+  const template = {
+    levels: [
+      { smallBlind: 0.14, bigBlind: 0.28, duration: 15 },
+      { smallBlind: 0.2, bigBlind: 0.4, duration: 15 },
+    ],
+  };
+  const result = createGuidedTournamentStructure(template, {
+    smallestChip: 0.07, players: 2, durationHours: 1e-8,
+  });
+  assert.equal(result.startingChipstack, 14);
+  assert.equal(result.levels.length, 2);
+  assert.deepEqual(result.levels.map((level) => level.duration), [1, 1]);
+});
+
+test("guided setup reports impossible selections and invalid template durations", () => {
+  const template = { levels: [{ smallBlind: 2, bigBlind: 4, duration: 15 }] };
+  const answers = { smallestChip: 1, players: 10, durationHours: 1 };
+  assert.throws(() => createGuidedTournamentStructure(template, { ...answers, smallestChip: 100, players: 1 }), /No starter-template blind levels/);
+  assert.throws(() => createGuidedTournamentStructure(template, { ...answers, smallestChip: 0.001 }), /whole-number starting chipstack/);
+  assert.throws(() => createGuidedTournamentStructure(template, { ...answers, players: 0 }), /player count/);
+  assert.throws(() => createGuidedTournamentStructure({ levels: [{ smallBlind: 2, bigBlind: 4, duration: 0 }] }, answers), /positive duration/);
+});
 
 test("zero and missing table limits use nine while explicit limits are retained", () => {
   assert.equal(normalizeMaxPlayersPerTable(0), 9);

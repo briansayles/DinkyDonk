@@ -40,6 +40,8 @@ export default function TournamentEditor({
 }) {
   const [startingChipstackFocused, setStartingChipstackFocused] = useState(false);
   const startingChipstackRef = useRef(null);
+  const levelDurationDialogRef = useRef(null);
+  const [levelDuration, setLevelDuration] = useState("");
   useLayoutEffect(() => {
     const value = draft?.startingChipstack;
     const number = Number(value);
@@ -71,9 +73,29 @@ export default function TournamentEditor({
         ? "Deep-stack tournament"
         : undefined;
 
+  function applyLevelDuration(event) {
+    event.preventDefault();
+    const input = event.currentTarget.elements.namedItem("duration");
+    if (!Number.isFinite(input.valueAsNumber)) {
+      input.setCustomValidity("Enter a valid duration.");
+      input.reportValidity();
+      return;
+    }
+
+    const duration = input.value;
+    setDraft((current) => ({
+      ...current,
+      levels: current.levels.map((level) =>
+        level.isBreak ? level : { ...level, duration },
+      ),
+    }));
+    levelDurationDialogRef.current.close();
+  }
+
   return (
     <>
             {draft && (
+              <>
               <form className="tournament-form" onSubmit={saveTournament}>
                 <h3>{editingId ? "Edit structure" : "New structure"}</h3>
                 <label className="form-field">
@@ -618,29 +640,41 @@ export default function TournamentEditor({
 
                 <div className="levels-heading" id="edit-entry-levels">
                   <h4>Levels</h4>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() =>
-                      setDraft((current) => {
-                        const previousLevel = [...current.levels]
-                          .reverse()
-                          .find((level) => !level.isBreak);
-                        return {
-                          ...current,
-                          levels: [
-                            ...current.levels,
-                            createNextLevel(
-                              previousLevel,
-                              current.levels.at(-1)?.duration ?? "",
-                            ),
-                          ],
-                        };
-                      })
-                    }
-                  >
-                    Add level
-                  </button>
+                  <div className="levels-heading-actions">
+                    <button
+                      type="button"
+                      disabled={saving || !draft.levels.some((level) => !level.isBreak)}
+                      onClick={() => {
+                        setLevelDuration("");
+                        levelDurationDialogRef.current.showModal();
+                      }}
+                    >
+                      Change all Level Durations
+                    </button>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() =>
+                        setDraft((current) => {
+                          const previousLevel = [...current.levels]
+                            .reverse()
+                            .find((level) => !level.isBreak);
+                          return {
+                            ...current,
+                            levels: [
+                              ...current.levels,
+                              createNextLevel(
+                                previousLevel,
+                                current.levels.at(-1)?.duration ?? "",
+                              ),
+                            ],
+                          };
+                        })
+                      }
+                    >
+                      Add level
+                    </button>
+                  </div>
                 </div>
 
                 <div className="tournament-level-table-wrapper">
@@ -940,6 +974,46 @@ export default function TournamentEditor({
                   </div>
                 </div>
               </form>
+              <dialog
+                ref={levelDurationDialogRef}
+                className="level-duration-dialog"
+                aria-labelledby="level-duration-dialog-heading"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    levelDurationDialogRef.current.close();
+                  }
+                }}
+              >
+                <form onSubmit={applyLevelDuration}>
+                  <h3 id="level-duration-dialog-heading">Change all Level Durations</h3>
+                  <p>Set the duration for all blind levels. Breaks are not changed.</p>
+                  <label className="form-field">
+                    Duration (minutes)
+                    <input
+                      name="duration"
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={levelDuration}
+                      onChange={(event) => {
+                        event.target.setCustomValidity("");
+                        setLevelDuration(event.target.value);
+                      }}
+                      autoFocus
+                      required
+                    />
+                  </label>
+                  <div className="level-duration-dialog-actions">
+                    <button type="button" onClick={() => levelDurationDialogRef.current.close()}>
+                      Cancel
+                    </button>
+                    <button type="submit">Apply</button>
+                  </div>
+                </form>
+              </dialog>
+              </>
             )}
     </>
   );

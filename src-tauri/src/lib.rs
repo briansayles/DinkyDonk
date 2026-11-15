@@ -251,6 +251,19 @@ fn default_tournament_structure() -> Tournament {
         (50.0, 100.0),
         (75.0, 150.0),
         (100.0, 200.0),
+        (150.0, 300.0),
+        (200.0, 400.0),
+        (300.0, 600.0),
+        (400.0, 800.0),
+        (500.0, 1000.0),
+        (750.0, 1500.0),
+        (1000.0, 2000.0),
+        (1500.0, 3000.0),
+        (2000.0, 4000.0),
+        (3000.0, 6000.0),
+        (4000.0, 8000.0),
+        (5000.0, 10000.0),
+        (7500.0, 15000.0),
     ]
     .into_iter()
     .map(|(small_blind, big_blind)| TournamentLevel {
@@ -269,7 +282,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 1.0,
             available_quantity: None,
-            quantity_per_player: Some(20),
+            quantity_per_player: Some(0),
         },
         TournamentChip {
             color: "#ff0000".to_string(),
@@ -278,7 +291,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 5.0,
             available_quantity: None,
-            quantity_per_player: Some(16),
+            quantity_per_player: Some(0),
         },
         TournamentChip {
             color: "#008000".to_string(),
@@ -287,7 +300,7 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 25.0,
             available_quantity: None,
-            quantity_per_player: Some(8),
+            quantity_per_player: Some(0),
         },
         TournamentChip {
             color: "#000000".to_string(),
@@ -296,7 +309,25 @@ fn default_tournament_structure() -> Tournament {
             edge_spot_quantity: Some(6),
             denomination: 100.0,
             available_quantity: None,
-            quantity_per_player: Some(2),
+            quantity_per_player: Some(0),
+        },
+        TournamentChip {
+            color: "#000589".to_string(),
+            text_color: Some("#ffffff".to_string()),
+            edge_spot_color: Some("#ffffff".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 500.0,
+            available_quantity: None,
+            quantity_per_player: Some(0),
+        },
+        TournamentChip {
+            color: "#c5e300".to_string(),
+            text_color: Some("#000000".to_string()),
+            edge_spot_color: Some("#000000".to_string()),
+            edge_spot_quantity: Some(6),
+            denomination: 1000.0,
+            available_quantity: None,
+            quantity_per_player: Some(0),
         },
     ];
     Tournament {

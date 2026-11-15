@@ -41,6 +41,108 @@ export const PAYOUT_ROUND_TO_TABLE = [
   { minPayout: Infinity, roundTo: 500 },
 ];
 
+export function createGuidedTournamentStructure(tournament, answers) {
+  const { smallestChip, players, durationHours } = answers;
+  const rawStartingStack = smallestChip * 400;
+  let startingChipstack = Math.round(rawStartingStack);
+  if (
+    !Number.isFinite(smallestChip) || smallestChip <= 0 ||
+    !Number.isSafeInteger(startingChipstack) || startingChipstack <= 0 ||
+    Math.abs(rawStartingStack - startingChipstack) >
+      Number.EPSILON * Math.max(1, rawStartingStack) * 4
+  ) {
+    throw new Error("The smallest chip must produce a positive whole-number starting chipstack when multiplied by 400.");
+  }
+  if (!Number.isSafeInteger(players) || players <= 0) {
+    throw new Error("The approximate player count must be a positive whole number.");
+  }
+  const totalChips = startingChipstack * players;
+  const totalMinutes = durationHours * 60;
+  if (
+    !Number.isFinite(totalChips) || !Number.isFinite(totalMinutes) ||
+    !Number.isFinite(totalMinutes * 60_000) || totalMinutes <= 0
+  ) {
+    throw new Error("The requested player count or duration is too large.");
+  }
+
+  function getLevels(stack) {
+    const maximumBigBlind = stack * players * 0.1;
+    const levels = tournament.levels.filter((level) => {
+      if (level.isBreak) return true;
+      if (
+        level.smallBlind == null || level.bigBlind == null ||
+        !Number.isFinite(Number(level.smallBlind)) ||
+        !Number.isFinite(Number(level.bigBlind))
+      ) {
+        throw new Error("The starter template contains a level without valid blinds.");
+      }
+      return Number(level.smallBlind) >= smallestChip * 2 &&
+        Number(level.bigBlind) <= maximumBigBlind;
+    });
+    const templateBlindLevels = tournament.levels.filter((level) => !level.isBreak);
+    const highestTemplateBigBlind = Math.max(...templateBlindLevels.map((level) => Number(level.bigBlind)));
+    if (maximumBigBlind >= 20_000 && highestTemplateBigBlind < maximumBigBlind) {
+      const progression = templateBlindLevels
+        .filter((level) => Number(level.smallBlind) >= 1_000 && Number(level.smallBlind) < 10_000)
+        .sort((first, second) => Number(first.smallBlind) - Number(second.smallBlind));
+      if (!progression.some((level) => Number(level.smallBlind) === 1_000 && Number(level.bigBlind) === 2_000)) {
+        throw new Error("The starter template must include a 1,000/2,000 level to extend the blind schedule.");
+      }
+
+      const highestTemplateSmallBlind = Math.max(...templateBlindLevels.map((level) => Number(level.smallBlind)));
+      const lowestProgressionBigBlind = Math.min(...progression.map((level) => Number(level.bigBlind)));
+      if (lowestProgressionBigBlind <= 0) {
+        throw new Error("The starter template contains an invalid blind progression.");
+      }
+      for (let multiplier = 10; lowestProgressionBigBlind * multiplier <= maximumBigBlind; multiplier *= 10) {
+        for (const level of progression) {
+          const smallBlind = Number(level.smallBlind) * multiplier;
+          const bigBlind = Number(level.bigBlind) * multiplier;
+          if (
+            smallBlind <= highestTemplateSmallBlind ||
+            smallBlind < smallestChip * 2 || bigBlind > maximumBigBlind
+          ) continue;
+          const ante = level.ante == null ? level.ante : Number(level.ante) * multiplier;
+          if (ante != null && !Number.isFinite(ante)) {
+            throw new Error("The starter template contains an invalid ante in the blind progression.");
+          }
+          levels.push({ ...level, smallBlind, bigBlind, ante });
+        }
+      }
+    }
+    if (!levels.some((level) => !level.isBreak)) {
+      throw new Error("No starter-template blind levels match the selected chip denomination and player count.");
+    }
+    if (levels.some((level) => !Number.isFinite(Number(level.duration)) || Number(level.duration) <= 0)) {
+      throw new Error("The starter template contains a level without a positive duration.");
+    }
+    return levels;
+  }
+
+  let levels = getLevels(startingChipstack);
+  let levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
+  if (levelDuration < 10) {
+    if (!Number.isSafeInteger(startingChipstack / 2)) {
+      throw new Error("The starting chipstack cannot be halved to a whole number. Choose a different smallest chip.");
+    }
+    startingChipstack /= 2;
+    levels = getLevels(startingChipstack);
+    levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
+  }
+
+  return {
+    ...tournament,
+    startingChipstack,
+    chips: (tournament.chips ?? []).filter((chip) =>
+      chip.denomination >= smallestChip,
+    ),
+    levels: levels.map((level) => ({
+      ...level,
+      duration: levelDuration,
+    })),
+  };
+}
+
 export function excelSequence(rows, columns = 1, start = 1, step = 1) {
   const rowCount = Math.trunc(rows);
   const columnCount = Math.trunc(columns);

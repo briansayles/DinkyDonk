@@ -4,6 +4,7 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import { downloadDir } from "@tauri-apps/api/path";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  createGuidedTournamentStructure,
   createNextLevel,
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
   DEFAULT_PAYOUT_MODEL,
@@ -40,6 +41,27 @@ import "./App.css";
 
 const tabs = ["Tournaments", "Settings", "About"];
 const userTourStorageKey = "dinkydonk-user-tour-seen";
+const guidedTournamentQuestions = [
+  {
+    key: "smallestChip",
+    label: "What is your smallest chip denomination?",
+    step: "any",
+    min: 0,
+  },
+  {
+    key: "players",
+    label: "Approximately how many players will you have?",
+    step: 1,
+    min: 1,
+    max: MAX_PARTICIPANT_COUNT,
+  },
+  {
+    key: "durationHours",
+    label: "How long should the tournament last?",
+    step: "any",
+    min: 0,
+  },
+];
 
 function createTournamentDraft(tournament) {
   return {
@@ -84,6 +106,14 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [creatingStructure, setCreatingStructure] = useState(false);
   const [structureCreationError, setStructureCreationError] = useState("");
+  const guidedDialogRef = useRef(null);
+  const guidedAnswersResolverRef = useRef(null);
+  const [guidedStep, setGuidedStep] = useState(0);
+  const [guidedAnswers, setGuidedAnswers] = useState({
+    smallestChip: "",
+    players: "",
+    durationHours: "",
+  });
   const [editSectionToActivate, setEditSectionToActivate] = useState(null);
   const [draft, setDraft] = useState(null);
   const [entriesCollapsed, setEntriesCollapsed] = useState(false);
@@ -371,7 +401,7 @@ function App() {
     setEditSectionToActivate(null);
   }, [draft, editSectionToActivate, editingId]);
 
-  async function startNewTournament() {
+  async function startNewTournament(guidedAnswers = null) {
     setStructureCreationError("");
     setCreatingStructure(true);
     setEditingId(null);
@@ -379,14 +409,67 @@ function App() {
       const defaultTournament = await invoke(
         "get_default_tournament_structure",
       );
-      setDraft(createTournamentDraft(defaultTournament));
+      const tournament = guidedAnswers
+        ? createGuidedTournamentStructure(defaultTournament, guidedAnswers)
+        : defaultTournament;
+      setDraft(createTournamentDraft(tournament));
     } catch (error) {
-      console.error("Could not load the default tournament structure.", error);
+      console.error("Could not create the tournament structure.", error);
       setStructureCreationError(
-        "The default tournament structure could not be loaded.",
+        guidedAnswers && error instanceof Error
+          ? error.message
+          : "The default tournament structure could not be loaded.",
       );
     } finally {
       setCreatingStructure(false);
+    }
+  }
+
+  async function startNewTournamentGuided() {
+    setStructureCreationError("");
+    setGuidedAnswers({ smallestChip: "", players: "", durationHours: "" });
+    setGuidedStep(0);
+    try {
+      guidedDialogRef.current.showModal();
+    } catch (error) {
+      console.error("Could not open guided tournament setup.", error);
+      setStructureCreationError("Guided tournament setup could not be opened.");
+      return;
+    }
+
+    const answers = await new Promise((resolve) => {
+      guidedAnswersResolverRef.current = resolve;
+    });
+    if (answers === null) return;
+
+    await startNewTournament(answers);
+  }
+
+  function finishGuidedTournamentQuestions(answers) {
+    const resolve = guidedAnswersResolverRef.current;
+    guidedAnswersResolverRef.current = null;
+    guidedDialogRef.current.close();
+    resolve(answers);
+  }
+
+  function submitGuidedTournamentQuestion(event) {
+    event.preventDefault();
+    const input = event.currentTarget.elements.namedItem("guided-answer");
+    const value = Number(input.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      input.setCustomValidity("Enter a number greater than zero.");
+      input.reportValidity();
+      return;
+    }
+
+    if (guidedStep < guidedTournamentQuestions.length - 1) {
+      setGuidedStep((step) => step + 1);
+    } else {
+      finishGuidedTournamentQuestions({
+        smallestChip: Number(guidedAnswers.smallestChip),
+        players: Number(guidedAnswers.players),
+        durationHours: value,
+      });
     }
   }
 
@@ -848,6 +931,71 @@ function App() {
         </button>
       </header>
 
+      <dialog
+        ref={guidedDialogRef}
+        className="guided-tournament-dialog"
+        aria-labelledby="guided-tournament-heading"
+        onCancel={(event) => {
+          event.preventDefault();
+          finishGuidedTournamentQuestions(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            finishGuidedTournamentQuestions(null);
+          }
+        }}
+      >
+        <form onSubmit={submitGuidedTournamentQuestion}>
+          <h3 id="guided-tournament-heading">Guided tournament setup</h3>
+          <p>Question {guidedStep + 1} of {guidedTournamentQuestions.length}</p>
+          {guidedStep === 2 && (
+            <p>
+              For approximately {Number(guidedAnswers.players).toLocaleString()} players.
+            </p>
+          )}
+          <label className="form-field">
+            {guidedTournamentQuestions[guidedStep].label}
+            {guidedStep === 2 && " (hours)"}
+            <input
+              key={guidedTournamentQuestions[guidedStep].key}
+              name="guided-answer"
+              type="number"
+              inputMode={guidedStep === 1 ? "numeric" : "decimal"}
+              min={guidedTournamentQuestions[guidedStep].min}
+              max={guidedTournamentQuestions[guidedStep].max}
+              step={guidedTournamentQuestions[guidedStep].step}
+              value={guidedAnswers[guidedTournamentQuestions[guidedStep].key]}
+              onChange={(event) => {
+                event.target.setCustomValidity("");
+                const { value } = event.target;
+                const { key } = guidedTournamentQuestions[guidedStep];
+                setGuidedAnswers((answers) => ({
+                  ...answers,
+                  [key]: value,
+                }));
+              }}
+              autoFocus
+              required
+            />
+          </label>
+          <div className="guided-tournament-dialog-actions">
+            <button type="button" onClick={() => finishGuidedTournamentQuestions(null)}>
+              Cancel
+            </button>
+            {guidedStep > 0 && (
+              <button type="button" onClick={() => setGuidedStep((step) => step - 1)}>
+                Back
+              </button>
+            )}
+            <button type="submit">
+              {guidedStep === guidedTournamentQuestions.length - 1 ? "Continue" : "Next"}
+            </button>
+          </div>
+        </form>
+      </dialog>
+
       {newRelease && (
         <div className="release-notice" role="status">
           <span>
@@ -996,14 +1144,24 @@ function App() {
             {!draft && (
               <div className="tournament-heading">
                 <p>Manage tournament structures and their blind levels.</p>
-                <button
-                  data-tour="create-structure"
-                  type="button"
-                  onClick={startNewTournament}
-                  disabled={loadingTournaments || saving || creatingStructure}
-                >
-                  {creatingStructure ? "Loading template..." : "Create structure"}
-                </button>
+                <div className="tournament-heading-actions">
+                  <button
+                    data-tour="create-structure"
+                    type="button"
+                    onClick={() => startNewTournament()}
+                    disabled={loadingTournaments || saving || creatingStructure}
+                  >
+                    {creatingStructure ? "Loading template..." : "Create structure"}
+                  </button>
+                  <button
+                    data-tour="create-structure"
+                    type="button"
+                    onClick={startNewTournamentGuided}
+                    disabled={loadingTournaments || saving || creatingStructure}
+                  >
+                    {creatingStructure ? "Loading template..." : "Create structure (Guided Mode)"}
+                  </button>
+                </div>
               </div>
             )}
 
