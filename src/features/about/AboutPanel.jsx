@@ -16,6 +16,22 @@ const features = [
     "Create and edit buy-in, rebuy, and add-on options; chip inventories; blind schedules; and players-per-table limits.",
   ],
   [
+    "Payout management",
+    "Configure and manage tournament payouts, including minimum payouts and rounding rules.",
+  ],
+  [
+    "Blind schedules",
+    "Define and manage blind levels, including duration, small and big blinds, and ante.",
+  ],
+  [
+    "Player management",
+    "Add, edit, and remove players, track their entries and bustouts, and manage seating arrangements.",
+  ],
+  [
+    "Guided tournament creation",
+    "Step-by-step guidance for creating new tournaments, ensuring all necessary configurations are set up correctly.",
+  ],
+  [
     "Copy structures",
     "Duplicate a structure's configuration without carrying over timer state, entry counts, bustouts, or payouts.",
   ],
