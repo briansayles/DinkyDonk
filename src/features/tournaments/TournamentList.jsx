@@ -7,9 +7,51 @@ import {
   getMaxChipSupportedPlayers,
 } from "../../domain/tournament";
 
+function TournamentActionIcon({ name }) {
+  return (
+    <svg
+      className="tournament-card-action-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {name === "edit" && (
+        <path d="M4 20l4-.8L20 7.2 16.8 4 4.8 16zM14.8 6l3.2 3.2" />
+      )}
+      {name === "copy" && (
+        <>
+          <rect x="8" y="8" width="12" height="12" rx="1.5" />
+          <path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" />
+        </>
+      )}
+      {name === "export" && (
+        <>
+          <path d="M13 21H5V3h8l4 4v5M13 3v5h4M17 13v8m-3-3 3 3 3-3" />
+          <text x="6" y="16" fill="currentColor" stroke="none" fontSize="5" fontWeight="700">CSV</text>
+        </>
+      )}
+      {name === "timer" && (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </>
+      )}
+      {name === "delete" && (
+        <path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 3v7m4-7v7" />
+      )}
+    </svg>
+  );
+}
+
 export default function TournamentList({
   activeTournamentId,
   copyTournament,
+  deleteTournament,
   draft,
   editTournament,
   expandedTournamentId,
@@ -41,59 +83,77 @@ export default function TournamentList({
                     <li className="tournament-card" key={tournament.id}>
                       <div className="tournament-card-heading">
                         <h3>{tournament.name}</h3>
-                        <div className="tournament-card-heading-spacer" />
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => editTournament(tournament)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => copyTournament(tournament.id)}
-                        >
-                          Copy
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          onClick={() => onExportTournament(tournament)}
-                        >
-                          Export CSVs
-                        </button>
-                        <button
-                          className={
-                            activeTournamentId === tournament.id
-                              ? "active-tournament-button"
-                              : ""
-                          }
-                          type="button"
-                          disabled={saving}
-                          aria-pressed={activeTournamentId === tournament.id}
-                          onClick={() => onSetActive(tournament.id)}
-                        >
-                          Go to Timer
-                        </button>
-                        <button
-                          className="tournament-card-toggle"
-                          type="button"
-                          aria-label={`${isExpanded ? "Collapse" : "Expand"} ${tournament.name}`}
-                          aria-expanded={isExpanded}
-                          onClick={() =>
-                            setExpandedTournamentId((current) =>
-                              current === tournament.id ? null : tournament.id,
-                            )
-                          }
-                        >
-                          <span
-                            className={`tournament-card-chevron${
-                              isExpanded ? " expanded" : ""
-                            }`}
-                            aria-hidden="true"
-                          />
-                        </button>
+                        <div className="tournament-card-actions">
+                          <button
+                            className="tournament-card-action"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`Edit ${tournament.name}`}
+                            title="Edit"
+                            onClick={() => editTournament(tournament)}
+                          >
+                            <TournamentActionIcon name="edit" />
+                          </button>
+                          <button
+                            className="tournament-card-action"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`Copy ${tournament.name}`}
+                            title="Copy"
+                            onClick={() => copyTournament(tournament.id)}
+                          >
+                            <TournamentActionIcon name="copy" />
+                          </button>
+                          <button
+                            className="tournament-card-action"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`Export ${tournament.name} to CSV`}
+                            title="Export CSVs"
+                            onClick={() => onExportTournament(tournament)}
+                          >
+                            <TournamentActionIcon name="export" />
+                          </button>
+                          <button
+                            className="tournament-card-action"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`Go to timer for ${tournament.name}`}
+                            title="Go to Timer"
+                            aria-pressed={activeTournamentId === tournament.id}
+                            onClick={() => onSetActive(tournament.id)}
+                          >
+                            <TournamentActionIcon name="timer" />
+                          </button>
+                          <button
+                            className="tournament-card-action tournament-card-delete"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`Delete ${tournament.name}`}
+                            title="Delete"
+                            onClick={() => deleteTournament(tournament.id)}
+                          >
+                            <TournamentActionIcon name="delete" />
+                          </button>
+                          <button
+                            className="tournament-card-toggle"
+                            type="button"
+                            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${tournament.name}`}
+                            aria-expanded={isExpanded}
+                            onClick={() =>
+                              setExpandedTournamentId((current) =>
+                                current === tournament.id ? null : tournament.id,
+                              )
+                            }
+                          >
+                            <span
+                              className={`tournament-card-chevron${
+                                isExpanded ? " expanded" : ""
+                              }`}
+                              aria-hidden="true"
+                            />
+                          </button>
+                        </div>
                       </div>
                       {isExpanded && (
                         <div className="tournament-card-content">

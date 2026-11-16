@@ -257,109 +257,94 @@
 }
 
 .timer-tab-panel-active {
-  animation: timer-panel-color-cycle 240s linear infinite;
-}
-
-.timer-tab-panel-active {
   color: #fff;
   animation:
     timer-panel-color-cycle 240s linear infinite,
     timer-complementary-text-color-cycle 240s linear infinite;
 }
 
-.timer-tab-panel-active .timer-blinds-group,
-.timer-tab-panel-active .timer-next-blinds-group,
-.timer-tab-panel-active .timer-clock,
-.timer-tab-panel-active .timer-message,
-.timer-tab-panel-active .timer-entry-heading h3,
-.timer-tab-panel-active .timer-entry-table thead th,
-.timer-tab-panel-active .timer-bustout-table thead th,
-.timer-tab-panel-active .timer-tables-table thead th,
-.timer-tab-panel-active .timer-entry-table,
-.timer-tab-panel-active .timer-entry-table th,
-.timer-tab-panel-active .timer-entry-table td,
-.timer-tab-panel-active .timer-bustout-table,
-.timer-tab-panel-active .timer-bustout-table th,
-.timer-tab-panel-active .timer-bustout-table td,
-.timer-tab-panel-active .timer-tables-table,
-.timer-tab-panel-active .timer-tables-table th,
-.timer-tab-panel-active .timer-tables-table td {
-  animation: timer-complementary-color-cycle 240s linear infinite;
-}
-
-.timer-tab-panel-active .timer-entry-heading,
-.timer-tab-panel-active .timer-entry-controls,
-.timer-tab-panel-active .timer-bustout-controls,
-.timer-tab-panel-active .timer-tables-controls,
-.timer-tab-panel-active .timer-entry-table th,
-.timer-tab-panel-active .timer-entry-table td,
-.timer-tab-panel-active .timer-bustout-table th,
-.timer-tab-panel-active .timer-bustout-table td,
-.timer-tab-panel-active .timer-tables-table th,
-.timer-tab-panel-active .timer-tables-table td {
-  animation: timer-complementary-color-cycle 240s linear infinite;
-}
-
-.timer-tab-panel-active .timer-payout-section {
+.timer-tab-panel-active :not(.timer-left-chips, .timer-left-chips *, .timer-fullscreen-error, .timer-payout-match) {
   color: var(--timer-complementary-text-color);
-  animation: timer-complementary-color-cycle 240s linear infinite;
 }
 
-.timer-tab-panel-active .timer-payout-section .timer-entry-heading h3,
-.timer-tab-panel-active .timer-payout-section .timer-payout-table,
-.timer-tab-panel-active .timer-payout-section .timer-payout-table th,
-.timer-tab-panel-active .timer-payout-section .timer-payout-table td,
-.timer-tab-panel-active .timer-payout-section input {
-  color: var(--timer-complementary-text-color);
-  animation: none;
+@media (prefers-reduced-motion: no-preference) {
+  .timer-tab-panel-active :is(
+    .timer-entry-heading,
+    .timer-entry-controls,
+    .timer-bustout-controls,
+    .timer-tables-controls,
+    .timer-payout-section,
+    .timer-entry-table,
+    .timer-bustout-table,
+    .timer-tables-table,
+    .timer-payout-table
+  ),
+  .timer-tab-panel-active :is(
+    .timer-entry-table,
+    .timer-bustout-table,
+    .timer-tables-table,
+    .timer-payout-table
+  ) :is(th, td) {
+    border-color: color-mix(in srgb, var(--timer-complementary-text-color) 70%, transparent);
+  }
 }
 
-.timer-tab-panel-active .timer-payout-section .timer-payout-table tfoot th,
-.timer-tab-panel-active .timer-payout-section .timer-payout-table tfoot td {
-  border-top-color: var(--timer-complementary-text-color);
+@keyframes timer-panel-color-cycle {
+  0%,
+  100% {
+    background-color: #35654d;
+  }
+
+  25% {
+    background-color: #50a6c2;
+  }
+
+  50% {
+    background-color: #000080;
+  }
+
+  75% {
+    background-color: #800020;
+  }
 }
 
-.timer-tab-panel-active .timer-entry-controls {
-  color: var(--timer-complementary-text-color);
-  animation: timer-complementary-color-cycle 240s linear infinite;
+@keyframes timer-complementary-text-color-cycle {
+  0%,
+  100% {
+    --timer-complementary-text-color: hsl(208 70% 80%);
+  }
+
+  25% {
+    --timer-complementary-text-color: hsl(44 60% 75%);
+  }
+
+  50% {
+    --timer-complementary-text-color: #fff;
+  }
+
+  75% {
+    --timer-complementary-text-color: hsl(272 70% 80%);
+  }
 }
 
-.timer-tab-panel-active .timer-entry-controls .timer-entry-heading h3,
-.timer-tab-panel-active .timer-entry-controls .timer-entry-table,
-.timer-tab-panel-active .timer-entry-controls .timer-entry-table th,
-.timer-tab-panel-active .timer-entry-controls .timer-entry-table td,
-.timer-tab-panel-active .timer-entry-controls input {
-  color: var(--timer-complementary-text-color);
-  animation: none;
+@media (prefers-reduced-motion: reduce) {
+  .timer-tab-panel-active {
+    --timer-complementary-text-color: #fff;
+    animation: none;
+  }
+
+  .timer-tab-panel-active .timer-message-text {
+    animation: none;
+  }
 }
 
-.timer-tab-panel-active .timer-entry-controls .timer-entry-table tfoot th,
-.timer-tab-panel-active .timer-entry-controls .timer-entry-table tfoot td {
-  border-top-color: var(--timer-complementary-text-color);
-}
-
-.timer-tab-panel-active button {
-  animation: timer-complementary-color-cycle 240s linear infinite;
-}
-
-.timer-tab-panel input {
-  border: 0;
-}
-
+.timer-tab-panel input,
 .timer-tab-panel button {
   border: 0;
 }
 
-.timer-tab-panel-active input {
-  animation: timer-complementary-color-cycle 240s linear infinite;
-}
-
 .timer-tab-panel-active .timer-volume-control input {
   accent-color: currentColor;
-}
-
-.timer-tab-panel-active .timer-volume-control {
-  color: var(--timer-complementary-text-color);
 }
 
 .timer-tab-panel:fullscreen {
@@ -402,67 +387,6 @@
   color: inherit;
 }
 
-@keyframes timer-panel-color-cycle {
-  0%,
-  100% {
-    background-color: #35654d;
-  }
-
-  25% {
-    background-color: #50a6c2;
-  }
-
-  50% {
-    background-color: #000080;
-  }
-
-  75% {
-    background-color: #800020;
-  }
-}
-
-@keyframes timer-complementary-color-cycle {
-  0%,
-  100% {
-    color: hsl(208 70% 80%);
-    border-color: hsl(208 70% 80% / 70%);
-  }
-
-  25% {
-    color: hsl(44 60% 75%);
-    border-color: hsl(44 60% 75% / 70%);
-  }
-
-  50% {
-    color: #fff;
-    border-color: rgb(255 255 255 / 70%);
-  }
-
-  75% {
-    color: hsl(272 70% 80%);
-    border-color: hsl(272 70% 80% / 70%);
-  }
-}
-
-@keyframes timer-complementary-text-color-cycle {
-  0%,
-  100% {
-    --timer-complementary-text-color: hsl(208 70% 80%);
-  }
-
-  25% {
-    --timer-complementary-text-color: hsl(44 60% 75%);
-  }
-
-  50% {
-    --timer-complementary-text-color: #fff;
-  }
-
-  75% {
-    --timer-complementary-text-color: hsl(272 70% 80%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .app-splash {
     transition: none;
@@ -470,47 +394,6 @@
 
   .app-splash-content,
   .app-splash-loader span {
-    animation: none;
-  }
-
-  .timer-tab-panel-active {
-    --timer-complementary-text-color: #fff;
-    animation: none;
-  }
-
-  .timer-tab-panel-active .timer-blinds-group,
-  .timer-tab-panel-active .timer-next-blinds-group,
-  .timer-tab-panel-active .timer-clock,
-  .timer-tab-panel-active .timer-message,
-  .timer-tab-panel-active .timer-message-text,
-  .timer-tab-panel-active .timer-entry-heading h3,
-  .timer-tab-panel-active .timer-entry-table thead th,
-  .timer-tab-panel-active .timer-bustout-table thead th,
-  .timer-tab-panel-active .timer-tables-table thead th,
-  .timer-tab-panel-active .timer-entry-table,
-  .timer-tab-panel-active .timer-entry-table th,
-  .timer-tab-panel-active .timer-entry-table td,
-  .timer-tab-panel-active .timer-bustout-table,
-  .timer-tab-panel-active .timer-bustout-table th,
-  .timer-tab-panel-active .timer-bustout-table td,
-  .timer-tab-panel-active .timer-tables-table,
-  .timer-tab-panel-active .timer-tables-table th,
-  .timer-tab-panel-active .timer-tables-table td {
-    animation: none;
-  }
-
-  .timer-tab-panel-active .timer-entry-heading,
-  .timer-tab-panel-active .timer-entry-controls,
-  .timer-tab-panel-active .timer-bustout-controls,
-  .timer-tab-panel-active .timer-tables-controls,
-  .timer-tab-panel-active .timer-entry-table th,
-  .timer-tab-panel-active .timer-entry-table td,
-  .timer-tab-panel-active .timer-bustout-table th,
-  .timer-tab-panel-active .timer-bustout-table td,
-  .timer-tab-panel-active .timer-tables-table th,
-  .timer-tab-panel-active .timer-tables-table td,
-  .timer-tab-panel-active input,
-  .timer-tab-panel-active button {
     animation: none;
   }
 }
@@ -624,34 +507,31 @@
 
 .timer-current-blinds-logo-slot {
   display: flex;
+  container-type: size;
   grid-column: 1;
+  flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   min-width: 0;
+  min-height: 0;
 }
 
 .timer-current-blinds-logo-slot img {
   display: block;
-  width: 100%;
-  max-height: 18vh;
+  width: min(100cqw, 100cqh);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
   object-fit: contain;
 }
 
-.timer-current-blinds-qr-slot {
+.timer-current-blinds-actions {
   display: flex;
   grid-column: 3;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  justify-content: flex-start;
   min-width: 0;
   text-align: center;
-}
-
-.timer-current-blinds-qr-slot img {
-  display: block;
-  width: 100%;
-  max-height: 18vh;
-  object-fit: contain;
 }
 
 .timer-qr-fullscreen-button {
@@ -661,7 +541,6 @@
   width: 3rem;
   height: 3rem;
   padding: 0;
-  margin-bottom: 0.75rem;
 }
 
 .timer-qr-fullscreen-button .timer-icon {
@@ -669,25 +548,16 @@
   height: 1.65rem;
 }
 
-.timer-support-link {
-  display: block;
-  width: 100%;
-}
-
-.timer-support-caption {
-  margin: 0.15rem 0 0;
-  font-size: clamp(0.45rem, 0.75vw, 0.7rem);
-  font-weight: 300;
-  line-height: 1.15;
-}
-
-.timer-tab-panel-active .timer-support-caption {
-  color: var(--timer-complementary-text-color);
-  animation: none;
+.timer-next-blinds-row {
+  display: grid;
+  grid-area: next;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.25rem;
 }
 
 .timer-next-blinds-group {
-  grid-area: next;
+  align-self: center;
 }
 
 .timer-blinds-group,
@@ -1254,6 +1124,27 @@
   gap: clamp(0.15rem, 0.75vh, 0.5rem);
 }
 
+.timer-qr-link {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+}
+
+.timer-qr-link img {
+  display: block;
+  width: min(100%, 8vh, 5rem);
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.timer-qr-caption {
+  margin-top: 0.15rem;
+  font-size: clamp(0.55rem, 0.9vw, 0.8rem);
+  line-height: 1.15;
+}
+
 .timer-grid-spacer {
   min-width: 0;
 }
@@ -1267,10 +1158,11 @@
   padding: 0 0.2em 0.02em;
   border-bottom: 1px solid currentColor;
   margin: 0 auto;
-  font-size: clamp(1.925rem, 17.6vh, 17.6rem);
+  font-size: min(clamp(1.925rem, 17.6vh, 17.6rem), var(--timer-blinds-fit, 17.6rem));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1.05;
+  white-space: nowrap;
 }
 
 .timer-clock-value,
@@ -1299,8 +1191,9 @@
 .timer-next-blinds-value-leaving-down {
   position: absolute;
   top: 0;
-  left: 0;
-  width: 100%;
+  left: 50%;
+  width: max-content;
+  translate: -50% 0;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -1408,10 +1301,11 @@
 .timer-countdown {
   position: relative;
   display: grid;
-  width: min(100%, 48vh, 36rem);
-  max-height: 100%;
+  min-height: 0;
+  max-width: 100%;
+  max-height: min(48vh, 36rem);
   aspect-ratio: 1;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   place-items: center;
 }
 
@@ -1464,7 +1358,7 @@
   z-index: 1;
   max-width: none;
   margin: 0;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -60%);
   font-size: clamp(1.5rem, 47.25cqi, 12rem);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -1515,16 +1409,18 @@
 }
 
 .timer-next-blinds {
+  position: relative;
   width: fit-content;
   max-width: 100%;
   min-height: 1.1em;
   padding: 0 0.2em 0.02em;
   border-bottom: 1px solid currentColor;
   margin: 0 auto;
-  font-size: clamp(1.094rem, 10vh, 10rem);
+  font-size: min(clamp(1.094rem, 10vh, 10rem), var(--timer-blinds-fit, 10rem));
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1.05;
+  white-space: nowrap;
   opacity: 0.75;
 }
 
@@ -2020,6 +1916,7 @@
 
 .settings-file-dialog,
 .guided-tournament-dialog,
+.delete-tournament-dialog,
 .level-duration-dialog {
   width: min(36rem, calc(100% - 2rem));
   border: 1px solid #b8c2d0;
@@ -2031,19 +1928,39 @@
 
 .settings-file-dialog::backdrop,
 .guided-tournament-dialog::backdrop,
+.delete-tournament-dialog::backdrop,
 .level-duration-dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 
 .settings-file-dialog form,
 .guided-tournament-dialog form,
+.guided-tournament-review,
+.delete-tournament-dialog-content,
 .level-duration-dialog form {
   display: grid;
   gap: 1rem;
 }
 
+.guided-tournament-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+  text-align: left;
+}
+
+.guided-tournament-summary dt {
+  font-weight: 600;
+}
+
+.guided-tournament-summary dd {
+  margin: 0;
+}
+
 .settings-file-dialog-actions,
 .guided-tournament-dialog-actions,
+.delete-tournament-dialog-actions,
 .level-duration-dialog-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2211,22 +2128,46 @@
   margin-top: 1rem;
 }
 
-.tournament-card-heading h3 {
-  margin-bottom: 0;
-  font-size: 1.5rem;
-}
-
 .tournament-card-heading {
   justify-content: flex-start;
+  flex-wrap: wrap;
 }
 
 .tournament-card-heading h3 {
+  flex: 1 1 12rem;
+  min-width: 0;
   margin: 0;
   font-size: 1.5rem;
+  overflow-wrap: anywhere;
 }
 
-.tournament-card-heading-spacer {
-  flex: 1 1 auto;
+.tournament-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  gap: 0.25rem;
+  margin-left: auto;
+}
+
+.tournament-card-action {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+}
+
+.tournament-card-action-icon {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.tournament-card-delete {
+  color: #a32121;
 }
 
 .tournament-card-toggle {
@@ -2240,7 +2181,14 @@
 
 .tournament-card-toggle:hover,
 .tournament-card-toggle:active {
+  border-color: transparent;
   background: transparent;
+}
+
+.tournament-card-action:focus-visible,
+.tournament-card-toggle:focus-visible {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
 }
 
 .tournament-card-chevron {
@@ -2254,20 +2202,6 @@
 
 .tournament-card-chevron.expanded {
   transform: rotate(225deg);
-}
-
-.tournament-card-heading > button:first-of-type {
-  flex: 0 0 auto;
-}
-
-.tournament-card-heading > .tournament-card-toggle {
-  margin-left: 0;
-}
-
-.tournament-card-heading > .tournament-card-toggle:hover,
-.tournament-card-heading > .tournament-card-toggle:active {
-  border-color: transparent;
-  background: transparent;
 }
 
 .tournament-card-content {
@@ -2400,14 +2334,6 @@
 
 .danger-button {
   color: #a32121;
-}
-
-.active-tournament-button,
-.active-tournament-button:disabled {
-  border-color: #3c8c4a;
-  background-color: #dff2e2;
-  color: #205b2b;
-  opacity: 1;
 }
 
 .form-actions {
@@ -2582,6 +2508,10 @@ textarea {
 
   .tournament-card {
     background-color: #383838;
+  }
+
+  .tournament-card-delete {
+    color: #ff8585;
   }
 
   .form-field input:disabled,

@@ -368,9 +368,10 @@ export function useTournaments() {
   }
 
   async function deleteTournament(id) {
-    const nextTournaments = tournaments.filter((item) => item.id !== id);
+    await flushTournamentFieldUpdates();
+    const nextTournaments = latestTournamentsRef.current.filter((item) => item.id !== id);
     const nextActiveTournamentId =
-      activeTournamentId === id ? null : activeTournamentId;
+      latestActiveTournamentIdRef.current === id ? null : latestActiveTournamentIdRef.current;
     return persistTournamentData(nextTournaments, nextActiveTournamentId);
   }
 

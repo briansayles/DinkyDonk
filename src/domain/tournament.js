@@ -1,8 +1,8 @@
 import { getCurrency } from "locale-currency";
 
 const curatedBlindValues = [
-  1, 2, 3, 4, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 
-  300, 400, 500, 750, 1000,
+  1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40, 50, 60, 80, 100, 150, 200, 
+  300, 400, 500, 600, 800, 1000,
 ];
 
 export const DEFAULT_EDGE_SPOT_QUANTITY = 6;
@@ -49,7 +49,7 @@ export function createGuidedTournamentStructure(tournament, answers) {
     !Number.isFinite(smallestChip) || smallestChip <= 0 ||
     !Number.isSafeInteger(startingChipstack) || startingChipstack <= 0 ||
     Math.abs(rawStartingStack - startingChipstack) >
-      Number.EPSILON * Math.max(1, rawStartingStack) * 4
+      Math.max(1, rawStartingStack) * 4
   ) {
     throw new Error("The smallest chip must produce a positive whole-number starting chipstack when multiplied by 400.");
   }
@@ -132,6 +132,7 @@ export function createGuidedTournamentStructure(tournament, answers) {
 
   return {
     ...tournament,
+    name: "T-" + formatChipNumber(startingChipstack).trimEnd() +  " Tournament " + new Date().toLocaleDateString(),
     startingChipstack,
     chips: (tournament.chips ?? []).filter((chip) =>
       chip.denomination >= smallestChip,
@@ -647,8 +648,10 @@ export function formatBlinds(smallBlind, bigBlind, ante) {
     if (value < 1_000) {
       return formatChipNumber(value);
     }
-
-    return `${formatChipNumber(value / 1_000).trimEnd()}k`;
+    if (value < 1_000_000) {
+      return `${formatChipNumber(value / 1_000).trimEnd()}k`;
+    }
+    return `${formatChipNumber(value / 1_000_000).trimEnd()}M`;
   };
   const blindText = `${formatBlindValue(small)}/${formatBlindValue(big)}`;
 
@@ -825,8 +828,8 @@ function hasLevelChange(levels, index, isLargeChange) {
     }
     const ratio = currentValue / previousValue;
     return isLargeChange
-      ? ratio > 1.5 + Number.EPSILON * 4
-      : ratio < 1.25 - Number.EPSILON * 4;
+      ? ratio > 1.5 
+      : ratio < 1.20 ;
   });
 }
 

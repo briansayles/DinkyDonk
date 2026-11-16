@@ -243,27 +243,32 @@ fn default_tournament_structure() -> Tournament {
         (3.0, 6.0),
         (4.0, 8.0),
         (5.0, 10.0),
+        (6.0, 12.0),
+        (8.0, 16.0),
         (10.0, 20.0),
         (15.0, 30.0),
         (20.0, 40.0),
         (30.0, 60.0),
         (40.0, 80.0),
         (50.0, 100.0),
-        (75.0, 150.0),
+        (60.0, 120.0),
+        (80.0, 160.0),
         (100.0, 200.0),
         (150.0, 300.0),
         (200.0, 400.0),
         (300.0, 600.0),
         (400.0, 800.0),
         (500.0, 1000.0),
-        (750.0, 1500.0),
+        (600.0, 1200.0),
+        (800.0, 1600.0),
         (1000.0, 2000.0),
         (1500.0, 3000.0),
         (2000.0, 4000.0),
         (3000.0, 6000.0),
         (4000.0, 8000.0),
         (5000.0, 10000.0),
-        (7500.0, 15000.0),
+        (6000.0, 12000.0),
+        (8000.0, 16000.0),
     ]
     .into_iter()
     .map(|(small_blind, big_blind)| TournamentLevel {
@@ -321,7 +326,7 @@ fn default_tournament_structure() -> Tournament {
             quantity_per_player: Some(0),
         },
         TournamentChip {
-            color: "#c5e300".to_string(),
+            color: "#d4ff00".to_string(),
             text_color: Some("#000000".to_string()),
             edge_spot_color: Some("#000000".to_string()),
             edge_spot_quantity: Some(6),
@@ -365,6 +370,7 @@ fn default_tournament_structure() -> Tournament {
     }
 }
 
+#[cfg(test)]
 fn default_tournament_data() -> TournamentData {
     let tournament = default_tournament_structure();
     TournamentData {
@@ -838,18 +844,12 @@ fn load_tournaments(
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let mut data = read_app_data(&app)?;
-    let mut changed = false;
+    load_tournaments_from_file(&configured_data_file(&app)?)
+}
 
-    if data.tournaments.is_empty() {
-        let defaults = default_tournament_data();
-        data.tournaments = defaults.tournaments;
-        data.active_tournament_id = defaults.active_tournament_id;
-        changed = true;
-    }
-
-    changed |= migrate_legacy_default_tournament_id(&mut data);
-
+fn load_tournaments_from_file(path: &Path) -> Result<TournamentData, String> {
+    let mut data = read_app_data_from_file(path)?;
+    let mut changed = migrate_legacy_default_tournament_id(&mut data);
     if let Some(active_tournament_id) = data.active_tournament_id.as_deref() {
         if !data
             .tournaments
@@ -862,7 +862,7 @@ fn load_tournaments(
     }
 
     if changed {
-        write_app_data(&app, &data)?;
+        write_app_data_to_file(path, &data)?;
     }
 
     Ok(TournamentData {
@@ -996,6 +996,56 @@ mod tests {
         AppData, DEFAULT_TOURNAMENT_ID, LEGACY_DEFAULT_TOURNAMENT_ID, TimerSettings,
         default_tournament_data, migrate_legacy_default_tournament_id,
     };
+
+    #[test]
+    fn loading_empty_tournaments_never_creates_a_default() {
+        let directory = std::env::temp_dir().join(format!(
+            "dinkydonk-empty-tournaments-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let path = directory.join("settings.json");
+
+        let missing = super::load_tournaments_from_file(&path).unwrap();
+        assert!(missing.tournaments.is_empty());
+        assert!(missing.active_tournament_id.is_none());
+        assert!(!path.exists());
+
+        let contents = r#"{"tournaments":[],"activeTournamentId":null,"timerSettings":{"alarmSound":"single-ding","volume":0.5,"spokenAnnouncementEnabled":false,"announcement":"Level changed."}}"#;
+        std::fs::write(&path, contents).unwrap();
+        for _ in 0..2 {
+            let loaded = super::load_tournaments_from_file(&path).unwrap();
+            assert!(loaded.tournaments.is_empty());
+            assert!(loaded.active_tournament_id.is_none());
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), contents);
+        }
+
+        let mut data = super::read_app_data_from_file(&path).unwrap();
+        data.active_tournament_id = Some("missing-tournament".to_string());
+        super::write_app_data_to_file(&path, &data).unwrap();
+        let loaded = super::load_tournaments_from_file(&path).unwrap();
+        assert!(loaded.tournaments.is_empty());
+        assert!(loaded.active_tournament_id.is_none());
+        let saved = super::read_app_data_from_file(&path).unwrap();
+        assert!(saved.tournaments.is_empty());
+        assert!(saved.active_tournament_id.is_none());
+        assert_eq!(saved.timer_settings.unwrap().volume, 0.5);
+
+        let existing = super::default_tournament_data();
+        let mut data = super::read_app_data_from_file(&path).unwrap();
+        data.tournaments = existing.tournaments;
+        data.active_tournament_id = existing.active_tournament_id;
+        super::write_app_data_to_file(&path, &data).unwrap();
+        let contents = std::fs::read_to_string(&path).unwrap();
+        let loaded = super::load_tournaments_from_file(&path).unwrap();
+        assert_eq!(loaded.tournaments.len(), 1);
+        assert_eq!(loaded.active_tournament_id.as_deref(), Some(DEFAULT_TOURNAMENT_ID));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), contents);
+
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+    }
 
     #[test]
     fn choosing_settings_file_creates_a_copy_or_opens_existing_data() {

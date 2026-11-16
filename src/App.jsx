@@ -9,9 +9,12 @@ import {
   DEFAULT_ALLOW_PAYOUT_OVERRIDE,
   DEFAULT_PAYOUT_MODEL,
   DEFAULT_PERCENT_PAID,
+  formatChipNumber,
   formatCurrency,
+  getAggressivenessEvaluation,
   getEntryContributions,
   getEffectivePayouts,
+  getLevelStatistics,
   getPayoutTimerMessage,
   normalizeEdgeSpotQuantity,
   normalizeMaxPlayersPerTable,
@@ -96,6 +99,58 @@ function createTournamentDraft(tournament) {
   };
 }
 
+function GuidedTournamentReview({ tournament, onAccept, onStartOver, saving, error }) {
+  const blindLevels = tournament.levels.filter((level) => !level.isBreak);
+  const firstLevel = blindLevels[0];
+  const breakCount = tournament.levels.length - blindLevels.length;
+  const evaluation = getAggressivenessEvaluation(
+    getLevelStatistics(tournament.levels).aggressiveness,
+  );
+  const totalMinutes = tournament.levels.reduce(
+    (total, level) => total + Number(level.duration),
+    0,
+  );
+
+  return (
+    <div className="guided-tournament-review">
+      <h3 id="guided-tournament-review-heading">Review your tournament</h3>
+      <p>Accept to save the tournament and continue to the editor, or start over with new answers.</p>
+      <dl className="guided-tournament-summary">
+        <dt>Starting chipstack</dt>
+        <dd>{formatChipNumber(tournament.startingChipstack)}</dd>
+        <dt>Starting blinds</dt>
+        <dd>
+          {formatChipNumber(firstLevel.smallBlind)} / {formatChipNumber(firstLevel.bigBlind)}
+          {Number(firstLevel.ante) > 0 && ` + ${formatChipNumber(firstLevel.ante)} ante`}
+        </dd>
+        <dt>Number of levels</dt>
+        <dd>
+          {formatChipNumber(blindLevels.length)}
+          {breakCount > 0 && ` (${formatChipNumber(breakCount)} ${breakCount === 1 ? "break" : "breaks"})`}
+        </dd>
+        <dt>Duration of each level</dt>
+        <dd>
+          {formatChipNumber(firstLevel.duration)} {Number(firstLevel.duration) === 1 ? "minute" : "minutes"}
+          {breakCount > 0 && " (same for breaks)"}
+        </dd>
+        <dt>Total scheduled duration</dt>
+        <dd>{formatChipNumber(totalMinutes)} {totalMinutes === 1 ? "minute" : "minutes"}</dd>
+        <dt>Aggressiveness evaluation</dt>
+        <dd>{evaluation ?? "Not set"}</dd>
+      </dl>
+      <p>Please review the tournament details carefully before accepting. Once accepted, the tournament will be saved and you will proceed to the editor where you can modify the tournament settings as needed.</p>
+      <p>We've assumed a buy-in, chip colors/denominations, and a payout structure. You can change these settings in the editor.</p>
+      {error && <p className="storage-error" role="alert">{error}</p>}
+      <div className="guided-tournament-dialog-actions">
+        <button type="button" onClick={onStartOver} disabled={saving}>Start over</button>
+        <button type="button" onClick={onAccept} disabled={saving}>
+          {saving ? "Saving…" : "Accept"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
   const [runUserTour, setRunUserTour] = useState(false);
@@ -106,8 +161,18 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [creatingStructure, setCreatingStructure] = useState(false);
   const [structureCreationError, setStructureCreationError] = useState("");
+  const deleteDialogRef = useRef(null);
+  const deletingRef = useRef(false);
+  const [pendingDeletion, setPendingDeletion] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const guidedDialogRef = useRef(null);
+  const guidedReviewDialogRef = useRef(null);
   const guidedAnswersResolverRef = useRef(null);
+  const guidedSavingRef = useRef(false);
+  const [guidedPreview, setGuidedPreview] = useState(null);
+  const [guidedSaving, setGuidedSaving] = useState(false);
+  const [guidedSaveError, setGuidedSaveError] = useState("");
   const [guidedStep, setGuidedStep] = useState(0);
   const [guidedAnswers, setGuidedAnswers] = useState({
     smallestChip: "",
@@ -401,6 +466,28 @@ function App() {
     setEditSectionToActivate(null);
   }, [draft, editSectionToActivate, editingId]);
 
+  useEffect(() => {
+    if (!guidedPreview || guidedReviewDialogRef.current.open) return;
+    try {
+      guidedReviewDialogRef.current.showModal();
+    } catch (error) {
+      console.error("Could not open the guided tournament review.", error);
+      setGuidedPreview(null);
+      setStructureCreationError("The guided tournament review could not be opened.");
+    }
+  }, [guidedPreview]);
+
+  useEffect(() => {
+    if (!pendingDeletion || deleteDialogRef.current.open) return;
+    try {
+      deleteDialogRef.current.showModal();
+    } catch (error) {
+      console.error("Could not open the tournament deletion confirmation.", error);
+      setPendingDeletion(null);
+      setStructureCreationError("The tournament deletion confirmation could not be opened.");
+    }
+  }, [pendingDeletion]);
+
   async function startNewTournament(guidedAnswers = null) {
     setStructureCreationError("");
     setCreatingStructure(true);
@@ -412,7 +499,12 @@ function App() {
       const tournament = guidedAnswers
         ? createGuidedTournamentStructure(defaultTournament, guidedAnswers)
         : defaultTournament;
-      setDraft(createTournamentDraft(tournament));
+      const newDraft = createTournamentDraft(tournament);
+      if (guidedAnswers) {
+        setGuidedPreview(newDraft);
+      } else {
+        setDraft(newDraft);
+      }
     } catch (error) {
       console.error("Could not create the tournament structure.", error);
       setStructureCreationError(
@@ -427,6 +519,7 @@ function App() {
 
   async function startNewTournamentGuided() {
     setStructureCreationError("");
+    setGuidedSaveError("");
     setGuidedAnswers({ smallestChip: "", players: "", durationHours: "" });
     setGuidedStep(0);
     try {
@@ -450,6 +543,44 @@ function App() {
     guidedAnswersResolverRef.current = null;
     guidedDialogRef.current.close();
     resolve(answers);
+  }
+
+  function finishGuidedTournamentReview(action) {
+    if (guidedSavingRef.current) return;
+    guidedReviewDialogRef.current.close();
+    setGuidedPreview(null);
+    setGuidedSaveError("");
+    if (action === "restart") {
+      startNewTournamentGuided();
+    }
+  }
+
+  async function acceptGuidedTournament() {
+    if (guidedSavingRef.current) return;
+    guidedSavingRef.current = true;
+    setGuidedSaving(true);
+    setGuidedSaveError("");
+    let tournament;
+    let acceptedDraft;
+    try {
+      tournament = tournamentFromDraft(guidedPreview, null, null);
+      acceptedDraft = createTournamentDraft(tournament);
+      if (!(await saveTournamentData(tournament, null))) {
+        setGuidedSaveError("The tournament could not be saved. Please try again.");
+        return;
+      }
+    } catch (error) {
+      console.error("Could not save the guided tournament.", error);
+      setGuidedSaveError("The tournament could not be saved. Please try again.");
+      return;
+    } finally {
+      guidedSavingRef.current = false;
+      setGuidedSaving(false);
+    }
+    guidedReviewDialogRef.current.close();
+    setGuidedPreview(null);
+    setEditingId(tournament.id);
+    setDraft(acceptedDraft);
   }
 
   function submitGuidedTournamentQuestion(event) {
@@ -572,12 +703,8 @@ function App() {
     });
   }
 
-  async function saveTournament(event) {
-    event.preventDefault();
-    const existingTournament = editingId
-      ? tournaments.find((item) => item.id === editingId)
-      : null;
-    const tournament = {
+  function tournamentFromDraft(draft, editingId, existingTournament) {
+    return {
       id: editingId ?? crypto.randomUUID(),
       name: draft.name.trim(),
       startingChipstack:
@@ -651,19 +778,60 @@ function App() {
         })),
       ),
     };
+  }
 
+  async function saveTournament(event) {
+    event.preventDefault();
+    const existingTournament = editingId
+      ? tournaments.find((item) => item.id === editingId)
+      : null;
+    const tournament = tournamentFromDraft(draft, editingId, existingTournament);
     if (await saveTournamentData(tournament, editingId)) {
       setDraft(null);
       setEditingId(null);
     }
   }
 
-  async function deleteTournament(id) {
-    if (await removeTournament(id)) {
-      if (editingId === id) {
+  function deleteTournament(id) {
+    const tournament = tournaments.find((item) => item.id === id);
+    if (!tournament) {
+      setStructureCreationError("The tournament could not be found.");
+      return;
+    }
+    setStructureCreationError("");
+    setDeleteError("");
+    setPendingDeletion({ id: tournament.id, name: tournament.name });
+  }
+
+  function cancelTournamentDeletion() {
+    if (deletingRef.current) return;
+    deleteDialogRef.current.close();
+    setPendingDeletion(null);
+    setDeleteError("");
+  }
+
+  async function confirmTournamentDeletion() {
+    if (deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      if (!(await removeTournament(pendingDeletion.id))) {
+        setDeleteError("The tournament could not be deleted. Please try again.");
+        return;
+      }
+      deleteDialogRef.current.close();
+      if (editingId === pendingDeletion.id) {
         setDraft(null);
         setEditingId(null);
       }
+      setPendingDeletion(null);
+    } catch (error) {
+      console.error("Could not delete the tournament.", error);
+      setDeleteError("The tournament could not be deleted. Please try again.");
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   }
   const activeEntryCountDrafts = activeTournament
@@ -820,8 +988,14 @@ function App() {
     payoutPlaces,
     payouts: payoutValues,
   });
+  const averageChipstackMessage = averageChipstack > 0
+    ? `Average ChipStack: ${averageChipstack.toLocaleString()}`
+    : "";
   const timerMessages = [
     activeTournament?.name,
+    startingPlayers > 0
+      ? ` ${startingPlayers.toLocaleString()} Starting Players`
+      : "",
     totalPrizePool > 0
       ? `Total Prize Pool: ${formatCurrency(totalPrizePool)}`
       : "",
@@ -832,15 +1006,10 @@ function App() {
       payoutPlaces,
       payouts: payoutValues,
     }),
-    startingPlayers > 0
-      ? ` ${startingPlayers.toLocaleString()} Starting Players`
-      : "",
     remainingPlayers > 0
       ? ` ${remainingPlayers.toLocaleString()} Players Remaining`
       : "",
-    averageChipstack > 0
-      ? `Average ChipStack: ${averageChipstack.toLocaleString()}`
-      : "",
+    averageChipstackMessage,
 
   ].filter(Boolean);
   const timer = useTimer({
@@ -877,6 +1046,16 @@ function App() {
     toggleTimerFullscreen,
     totalDurationMs,
   } = timer;
+  const currentBigBlind = currentLevel?.level.isBreak
+    ? 0
+    : Number(currentLevel?.level.bigBlind);
+  const displayedTimerMessage =
+    averageChipstackMessage &&
+    activeTimerMessageIndex === timerMessages.length - 1 &&
+    Number.isFinite(currentBigBlind) &&
+    currentBigBlind > 0
+      ? `${averageChipstackMessage} (${Math.round(averageChipstack / currentBigBlind).toLocaleString()}xBB)`
+      : activeTimerMessage;
   const previousTimerFullscreenRef = useRef(false);
 
   useEffect(() => {
@@ -999,6 +1178,72 @@ function App() {
             </button>
           </div>
         </form>
+      </dialog>
+
+      <dialog
+        ref={guidedReviewDialogRef}
+        className="guided-tournament-dialog"
+        aria-labelledby="guided-tournament-review-heading"
+        onCancel={(event) => {
+          event.preventDefault();
+          finishGuidedTournamentReview(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            finishGuidedTournamentReview(null);
+          }
+        }}
+      >
+        {guidedPreview && (
+          <GuidedTournamentReview
+            tournament={guidedPreview}
+            onAccept={acceptGuidedTournament}
+            onStartOver={() => finishGuidedTournamentReview("restart")}
+            saving={guidedSaving}
+            error={guidedSaveError}
+          />
+        )}
+      </dialog>
+
+      <dialog
+        ref={deleteDialogRef}
+        className="delete-tournament-dialog"
+        aria-labelledby="delete-tournament-heading"
+        aria-describedby="delete-tournament-question"
+        onCancel={(event) => {
+          event.preventDefault();
+          cancelTournamentDeletion();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            event.stopPropagation();
+            cancelTournamentDeletion();
+          }
+        }}
+      >
+        <div className="delete-tournament-dialog-content">
+          <h3 id="delete-tournament-heading">Delete tournament</h3>
+          <p id="delete-tournament-question">
+            Are you sure you want to delete {pendingDeletion?.name}?
+          </p>
+          {deleteError && <p className="storage-error" role="alert">{deleteError}</p>}
+          <div className="delete-tournament-dialog-actions">
+            <button type="button" onClick={cancelTournamentDeletion} disabled={deleting}>
+              Cancel
+            </button>
+            <button
+              className="danger-button"
+              type="button"
+              onClick={confirmTournamentDeletion}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        </div>
       </dialog>
 
       {newRelease && (
@@ -1150,21 +1395,21 @@ function App() {
               <div className="tournament-heading">
                 <p>Manage tournament structures and their blind levels.</p>
                 <div className="tournament-heading-actions">
-                  <button
+                  {/* <button
                     data-tour="create-structure"
                     type="button"
                     onClick={() => startNewTournament()}
                     disabled={loadingTournaments || saving || creatingStructure}
                   >
                     {creatingStructure ? "Loading template..." : "Create structure"}
-                  </button>
+                  </button> */}
                   <button
                     data-tour="create-structure"
                     type="button"
                     onClick={startNewTournamentGuided}
                     disabled={loadingTournaments || saving || creatingStructure}
                   >
-                    {creatingStructure ? "Loading template..." : "Create structure (Guided Mode)"}
+                    {creatingStructure ? "Loading template..." : "Create structure"}
                   </button>
                 </div>
               </div>
@@ -1188,6 +1433,7 @@ function App() {
               <TournamentList
                 activeTournamentId={activeTournamentId}
                 copyTournament={copyTournament}
+                deleteTournament={deleteTournament}
                 draft={draft}
                 editTournament={editTournament}
                 expandedTournamentId={expandedTournamentId}
@@ -1207,7 +1453,7 @@ function App() {
             {activeTournament ? (
               activeTab === "Timer" ? (
                 <TimerPanel
-                  activeTimerMessage={activeTimerMessage}
+                  activeTimerMessage={displayedTimerMessage}
                   activeTimerMessageIndex={activeTimerMessageIndex}
                   timerMessageCount={timerMessages.length}
                   currentLevel={currentLevel}

@@ -82,14 +82,15 @@ function TimerClock({ remainingMs }) {
   useLayoutEffect(() => {
     const element = clockRef.current;
     const container = element?.closest(".timer-clock-area");
+    const visual = element?.parentElement;
     const context = document.createElement("canvas").getContext("2d");
-    if (!element || !container || !context) {
+    if (!element || !container || !visual || !context) {
       return;
     }
 
     const resizeObserver = new ResizeObserver(() => {
-      const circleDiameter =
-        element.parentElement?.getBoundingClientRect().width ?? 0;
+      const circleBounds = visual.getBoundingClientRect();
+      const circleDiameter = Math.min(circleBounds.width, circleBounds.height);
       const availableWidth = container.clientWidth;
       const fontFamily = window.getComputedStyle(element).fontFamily;
       const referenceSize = 100;
@@ -105,6 +106,7 @@ function TimerClock({ remainingMs }) {
     });
 
     resizeObserver.observe(container);
+    resizeObserver.observe(visual);
     return () => resizeObserver.disconnect();
   }, [text]);
 
@@ -114,6 +116,112 @@ function TimerClock({ remainingMs }) {
         {text}
       </span>
     </p>
+  );
+}
+
+function TimerProgress({ className, radius, circumference, progress }) {
+  const circleRef = useRef(null);
+  const previousProgressRef = useRef(progress);
+
+  useLayoutEffect(() => {
+    const circle = circleRef.current;
+    // Keep the transition choice until the next progress change, even on rerenders.
+    circle.style.transition = progress > previousProgressRef.current
+      ? "stroke 0.25s ease"
+      : "";
+    circle.style.strokeDashoffset = circumference * (1 - progress);
+    previousProgressRef.current = progress;
+  }, [circumference, progress]);
+
+  return (
+    <circle
+      ref={circleRef}
+      className={`timer-progress-value ${className}`}
+      cx="50"
+      cy="50"
+      r={radius}
+      style={{ strokeDasharray: circumference }}
+    />
+  );
+}
+
+function useFitBlinds(value) {
+  const groupRef = useRef(null);
+  const valueRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const group = groupRef.current;
+    const element = valueRef.current;
+    if (!group || !element) {
+      return;
+    }
+
+    const measure = document.createElement("span");
+    measure.style.cssText =
+      "position: fixed; visibility: hidden; white-space: pre; font-size: 100px; left: -10000px; top: 0;";
+    document.body.appendChild(measure);
+
+    const updateSize = () => {
+      const style = window.getComputedStyle(element);
+      measure.style.fontFamily = style.fontFamily;
+      measure.style.fontWeight = style.fontWeight;
+      measure.style.fontStyle = style.fontStyle;
+      measure.style.fontStretch = style.fontStretch;
+      measure.style.fontVariantNumeric = style.fontVariantNumeric;
+      measure.style.fontFeatureSettings = style.fontFeatureSettings;
+      measure.style.letterSpacing = style.letterSpacing;
+      const texts = [value, ...Array.from(
+        element.querySelectorAll('[aria-hidden="true"]'),
+        (span) => span.textContent,
+      )];
+      const textWidth = Math.max(...texts.map((text) => {
+        measure.textContent = text;
+        return measure.getBoundingClientRect().width;
+      }));
+      const fontSize = parseFloat(style.fontSize);
+      if (textWidth > 0 && fontSize > 0 && group.clientWidth > 0) {
+        const padding = (parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)) / fontSize;
+        element.style.setProperty(
+          "--timer-blinds-fit",
+          `${(group.clientWidth * 0.99) / (textWidth / 100 + padding)}px`,
+        );
+      }
+    };
+
+    const observer = new ResizeObserver(updateSize);
+    const mutations = new MutationObserver(updateSize);
+    observer.observe(group);
+    mutations.observe(element, { childList: true, subtree: true, characterData: true });
+    updateSize();
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
+      measure.remove();
+    };
+  }, [value]);
+
+  return [groupRef, valueRef];
+}
+
+function NextBlinds({ direction, value, onEditSection }) {
+  const [groupRef, valueRef] = useFitBlinds(value);
+
+  return (
+    <div
+      ref={groupRef}
+      className="timer-next-blinds-group"
+      title="Double-click to edit the blinds schedule"
+      onDoubleClick={() => onEditSection("edit-entry-levels")}
+    >
+      <p ref={valueRef} className="timer-next-blinds">
+        <AnimatedBlindValue
+          className="timer-next-blinds-value"
+          direction={direction}
+          value={value}
+        />
+      </p>
+      <p className="timer-next-blinds-label">Next Blinds</p>
+    </div>
   );
 }
 
@@ -367,6 +475,7 @@ export default function TimerPanel({
           nextLevel.level.ante,
         );
   const isPaused = currentLevel && startedAt === null;
+  const [currentBlindsGroupRef, currentBlindsValueRef] = useFitBlinds(currentBlindsText);
 
   return (
     <div className={`timer-display${isPaused ? " timer-display-paused" : ""}`}>
@@ -374,17 +483,15 @@ export default function TimerPanel({
         <div className="timer-current-blinds-logo-slot">
           <img src="/dinkydonk_logo_transparent_edges.png" alt="DinkyDonk" />
         </div>
-        {/* <div className="timer-current-blinds-logo-slot">
-          <img src="/DinkyDonk_QR_Code.png" alt="DinkyDonk" height="50" />
-        </div> */}
         <div
+          ref={currentBlindsGroupRef}
           className="timer-blinds-group"
           data-tour="timer-blinds"
           title="Double-click to edit the blinds schedule"
           onDoubleClick={() => onEditSection("edit-entry-levels")}
         >
           <div className="timer-current-blinds-content">
-            <p className="timer-blinds" aria-hidden={!currentLevel}>
+            <p ref={currentBlindsValueRef} className="timer-blinds" aria-hidden={!currentLevel}>
               <AnimatedBlindValue
                 className="timer-blinds-value"
                 direction={blindsDirection}
@@ -399,7 +506,7 @@ export default function TimerPanel({
           </div>
           <p className="timer-blinds-label">Current Blinds</p>
         </div>
-        <div className="timer-current-blinds-qr-slot">
+        <div className="timer-current-blinds-actions">
           <button
             className="timer-qr-fullscreen-button"
             type="button"
@@ -417,41 +524,43 @@ export default function TimerPanel({
               name={timerIsFullscreen ? "exit-timer" : "fullscreen"}
             />
           </button>
-          <a
-            className="timer-support-link"
-            href="https://www.buymeacoffee.com/briansayles"
-            data-tour="timer-support"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Support DinkyDonk on Buy Me a Coffee"
-            title="Buy the Developer a Coffee"
-          >
-            <img
-              src="/qr-code.png"
-              alt="Buy Me a Coffee QR code"
-            />
-          </a>
-          <p className="timer-support-caption">
-            DinkyDonk runs on caffeine. Please consider supporting the developer.
-          </p>
         </div>
       </div>
-      {currentLevel && (
-        <div
-          className="timer-next-blinds-group"
-          title="Double-click to edit the blinds schedule"
-          onDoubleClick={() => onEditSection("edit-entry-levels")}
+      <div className="timer-next-blinds-row">
+        <a
+          className="timer-qr-link"
+          href="https://briansayles.github.io/DinkyDonk"
+          target="_blank"
+          rel="noreferrer"
+          title="Get DinkyDonk"
         >
-          <p className="timer-next-blinds">
-            <AnimatedBlindValue
-              className="timer-next-blinds-value"
-              direction={blindsDirection}
-              value={nextBlindsText}
-            />
-          </p>
-          <p className="timer-next-blinds-label">Next Blinds</p>
-        </div>
-      )}
+          <img src="/DinkyDonk_QR_Code.png" alt="DinkyDonk GitHub QR code" />
+          <span className="timer-qr-caption">
+            <br/>Get DinkyDonk.<br/>It's free and open source!
+          </span>
+        </a>
+        {currentLevel ? (
+          <NextBlinds
+            direction={blindsDirection}
+            value={nextBlindsText}
+            onEditSection={onEditSection}
+          />
+        ) : <div />}
+        <a
+          className="timer-qr-link"
+          href="https://www.buymeacoffee.com/briansayles"
+          data-tour="timer-support"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Support DinkyDonk on Buy Me a Coffee"
+          title="Buy the Developer a Coffee"
+        >
+          <img src="/qr-code.png" alt="Buy Me a Coffee QR code" />
+          <span className="timer-qr-caption">
+            <br/>Support DinkyDonk on<br/>Buy Me a Coffee!
+          </span>
+        </a>
+      </div>
       <div 
         ref={chipContainerRef}
         className="timer-left-chips" 
@@ -496,15 +605,11 @@ export default function TimerPanel({
                   cy="50"
                   r="46"
                 />
-                <circle
-                  className="timer-progress-value timer-progress-hours"
-                  cx="50"
-                  cy="50"
-                  r="46"
-                  style={{
-                    strokeDasharray: 289.03,
-                    strokeDashoffset: 289.03 * (1 - hourProgress),
-                  }}
+                <TimerProgress
+                  className="timer-progress-hours"
+                  radius="46"
+                  circumference={289.03}
+                  progress={hourProgress}
                 />
                 <circle
                   className="timer-progress-track"
@@ -512,15 +617,11 @@ export default function TimerPanel({
                   cy="50"
                   r="42.6"
                 />
-                <circle
-                  className="timer-progress-value timer-progress-minutes"
-                  cx="50"
-                  cy="50"
-                  r="42.6"
-                  style={{
-                    strokeDasharray: 267.66,
-                    strokeDashoffset: 267.66 * (1 - minuteProgress),
-                  }}
+                <TimerProgress
+                  className="timer-progress-minutes"
+                  radius="42.6"
+                  circumference={267.66}
+                  progress={minuteProgress}
                 />
                 <circle
                   className="timer-progress-track"
@@ -528,15 +629,11 @@ export default function TimerPanel({
                   cy="50"
                   r="39.2"
                 />
-                <circle
-                  className="timer-progress-value timer-progress-seconds"
-                  cx="50"
-                  cy="50"
-                  r="39.2"
-                  style={{
-                    strokeDasharray: 246.3,
-                    strokeDashoffset: 246.3 * (1 - secondProgress),
-                  }}
+                <TimerProgress
+                  className="timer-progress-seconds"
+                  radius="39.2"
+                  circumference={246.3}
+                  progress={secondProgress}
                 />
               </svg>
               <TimerClock remainingMs={currentLevel.remainingMs} />
