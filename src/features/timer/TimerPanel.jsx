@@ -374,6 +374,9 @@ export default function TimerPanel({
         <div className="timer-current-blinds-logo-slot">
           <img src="/dinkydonk_logo_transparent_edges.png" alt="DinkyDonk" />
         </div>
+        {/* <div className="timer-current-blinds-logo-slot">
+          <img src="/DinkyDonk_QR_Code.png" alt="DinkyDonk" height="50" />
+        </div> */}
         <div
           className="timer-blinds-group"
           data-tour="timer-blinds"

@@ -913,6 +913,11 @@ function App() {
           src="/dinkydonk_logo_transparent_edges.png"
           alt="DinkyDonk logo"
         />
+        {/* <img
+          className="app-heading-logo"
+          src="/DinkyDonk_QR_Code.png"
+          alt="DinkyDonk logo"
+        /> */}
         <div className="app-heading-copy">
           <h1 data-tour="app-title">
             DinkyDonk v{APP_VERSION} Poker Tournament Manager and Timer

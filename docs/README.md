@@ -90,7 +90,7 @@ If you find DinkyDonk useful, please consider supporting its author on [Buy Me a
 
 Copyright (C) 2026 Brian Sayles.
 
-DinkyDonk is licensed under the [GNU Affero General assets License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
+DinkyDonk is licensed under the [GNU Affero General assets License, version 3 or later](assets/LICENSE) (AGPL-3.0-or-later).
 
 ## Development
 
