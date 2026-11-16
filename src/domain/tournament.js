@@ -1,8 +1,8 @@
 import { getCurrency } from "locale-currency";
 
 const curatedBlindValues = [
-  1, 2, 3, 4, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 250,
-  300, 400, 500, 600, 750, 1000,
+  1, 2, 3, 4, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 200, 
+  300, 400, 500, 750, 1000,
 ];
 
 export const DEFAULT_EDGE_SPOT_QUANTITY = 6;

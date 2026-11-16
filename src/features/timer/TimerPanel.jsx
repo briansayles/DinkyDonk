@@ -372,7 +372,7 @@ export default function TimerPanel({
     <div className={`timer-display${isPaused ? " timer-display-paused" : ""}`}>
       <div className="timer-current-blinds-row">
         <div className="timer-current-blinds-logo-slot">
-          <img src="/dinkydonk-logo.png" alt="DinkyDonk" />
+          <img src="/dinkydonk_logo_transparent_edges.png" alt="DinkyDonk" />
         </div>
         <div
           className="timer-blinds-group"

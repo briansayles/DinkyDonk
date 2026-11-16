@@ -910,7 +910,7 @@ function App() {
       <header className="app-heading">
         <img
           className="app-heading-logo"
-          src="/dinkydonk-logo.png"
+          src="/dinkydonk_logo_transparent_edges.png"
           alt="DinkyDonk logo"
         />
         <div className="app-heading-copy">
@@ -1855,7 +1855,7 @@ function App() {
           <div className="app-splash-content">
             <img
               className="app-splash-logo"
-              src="/dinkydonk-logo.png"
+              src="/dinkydonk_logo_transparent_edges.png"
               alt="DinkyDonk"
             />
             <h1>DinkyDonk</h1>
