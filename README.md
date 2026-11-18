@@ -1,7 +1,68 @@
-> A fully-functional, easy-to-use, free and open-source desktop poker tournament manager and timer built with Tauri, React and Vite
-<p align="center">
-  <img src="public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180">
-</p>
+# <img src="public/dinkydonk-logo.png" alt="DinkyDonk logo" width="180"> 
+> A fully-functional, easy-to-use, free and open-source desktop poker tournament manager and timer built with Tauri, React, Rust and Vite
+
+## Features
+- **FREE AND OPEN-SOURCE FOREVER:** This program is 100% free to use and even modify
+  1. No cost to use...ever
+  2. No limits...ever
+  3. No signup required...ever
+  4. As open-source software, you are free to view the source code and even edit it for your own use or for distribution as a modified version as long as your modification is offered under the same license as the original (copy-left, AGPL3 or later)
+  
+  The only way I make any money on this project is by users voluntarily [buying me a coffee](https://buymeacoffee.com/briansayles)...I have a small QR code on the timer to publicize this request, which I think is very reasonable
+
+- **Guided Tournament Creation:** Create a new, **logical tournament structure** in seconds, by entering 
+  1. Your smallest chip denomination,
+  2. The number of players you expect, and
+  3. Your desired tournament length
+
+  Unlike many other apps, this one uses a curated list of blinds as its starting point, so you won't see levels like 32/64 or 48/96. The curated list will create a gradually increasing structure, if possible based on your inputs. If it can't, it will smartly remove certain levels to try to produce a tournament that meets your specifications.
+- **Tournament Editor:** Every aspect of the generated tournament structure is easily configurable:
+  1. Buyins, Rebuys, Addons available,
+  2. Blinds schedule (edit the small blind and the big blind will auto-populate with 2x the small blind, although you can over-ride it),
+  3. Chips available (typical chip colors and denominations will be pre-populated, but edit to your heart's content, including the color, denomination, text color, edge spot color and even the number of edge spots), and
+  4. Payout calculation parameters
+- **Blinds Schedule Analysis:** In edit mode, you'll see statistics and an evaluation of the blinds schedule:
+  1. Starting stack as a multiple of the first level's big blind
+  2. The number of players the schedule should be expected to support (assuming no rebuys, addons, etc...)
+  3. Average percent big blind increase per level
+  4. Average duration per level
+  5. Aggressiveness, defined as average percent big blind increase per minute, and
+  6. Aggressiveness evaluation: Slow, Balanced or Fast
+- **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed
+- **Your Data is Private:** All settings and tournament data are stored in JSON file(s) on your local machine, local network drive, or your own cloud-accessible storage, meaning:
+  1. The program does not need an internet connection to run,
+  2. The program is not dependent on a remote server/database
+  3. Your data is yours and yours alone...nothing gets shared outside of your control
+  4. There is nothing you need to log into
+  5. **You CAN share the data with multiple instances of the program running on the same or even different computers, which supports displaying the synchronized timer on multiple displays**
+- **Tournament Timer / Manager:** 
+  1. Run timed blind levels and breaks (play/pause, restart level, jump back/forward a level, and reset controls on screen),
+  2. Shows current and upcoming blinds that are nicely animated when they change,
+  3. Shows countdown progress along with animated hours/minutes/seconds progress circles,
+  4. Shows a rotating message including:
+      - Tournament name,
+      - Staring players,
+      - Total payout,
+      - Players to be paid,
+      - Players remaining, and
+      - Average chipstack (actual and as a multiple of the big blind)
+  5. Shows chips in play with animation to show when a chips will no longer be needed in the next level (they fade in and out) and animation when the chips in play change
+  6. The timer screen runs in full screen mode for a more professional look
+  7. The timer's background color and text color continuously and gradually changes
+      - The background changes between 4 typical poker table cloth colors
+      - The text color changes simultaneously using a calculated complimentary color
+  8. When the timer is paused, the background color is set to grey and a 'timer paused' banner is displayed over the current blinds
+  9. When the timer is running, the screen will be kept awake (good luck with that using any web-based tool on an Apple device!)
+- **Buyin Management** The timer screen is your place for entering buyins, rebuys, addons, and other prize pool or chips in play additions, all via simple spinner controls
+- **Payouts Management** The paytable is automatically created based on your entries in the structure editor:
+  1. Percent of players to be paid, and
+  2. Paytable shape (flat, balanced or top heavy)
+If the paytable is allowed to be over-ridden, it can be edited on the timer screen via spinners for number to be paid and for each place's payout
+- **Bustouts Management** Use the bustouts spinner on the timer screen to record bustouts
+- **Tables Management** The program doesn't currently support tracking players individually, so table/seat assignments aren't feasible, but the program does show the number of tables needed with x players and x-1 players in order to be balanced, given the maximum players per table entered on the timer screen
+- **Tournament Tracking:** All entries and bustouts are timestamped and recorded with pertinent details such as the elapsed tournament time and blinds at the time of bustout
+- **CSV export:** Use **Export CSVs** on a tournament structure to create separate structure and results files that can be imported into 3rd party programs or services
+- **Updates:** At startup, the app checks GitHub for a newer published release which can be downloaded from the project's GitHub page and installed without affecting any existing tournaments or data
 
 ## Screenshots
 
@@ -16,27 +77,6 @@
     <img src="public/Screenshot Settings 1.png" alt="Screenshot Settings 1" width="220">
     <img src="public/Screenshot Settings 2.png" alt="Screenshot Settings 2" width="220">    
 </p>
-
-## Features
-
-- **Tournament timer:** Run timed blind levels and breaks, see current and upcoming blinds, and follow countdown progress. The rotating message includes players paid once there are entries or an active paytable override. After the final scheduled level, the display stays at zero while elapsed time continues until paused or the tournament ends.
-- **Timer controls:** Play and pause, reset or restart a level, jump between levels, and use fullscreen mode. When paused, the blinds remain visible but faded, with a gently fading pause indicator over the current blinds.
-- **Chip display:** Track chips in use and animate color-ups: departing chips slide out before replacement chips slide in, while retained chips move into position. The direction reverses when moving back through levels.
-- **Shared-file updates:** Tournament structures, the active tournament, and timer preferences are stored together in a JSON file. Choose an existing `.json` file or enter a new filename to create a file containing the current settings. Existing files are opened rather than replaced. Multiple instances can share the same file on one or more computers, keeping their tournaments in sync. Volume controls can be adjusted per instance, and sounds can play alongside background music.
-- **Tournament structures:** Create and edit buy-in, rebuy, and add-on options; chip inventories; blind schedules; and players-per-table limits. Set all blind-level durations at once without changing breaks. Blind levels are sorted across breaks, which retain their positions. The editor highlights levels where either blind increases by less than 25% or more than 50% from the previous blind level.
-- ** Guided tournament creation:** Create new tournament structure using guided mode: enter smallest denomination chip, number of players and desired time and the program creates a logical tournament structure, including chips and starting stack.
-- **Guided setup:** The starter template keeps chips at or above the selected smallest denomination and starts with a stack of 400 times that denomination. It extends the template's 1,000/2,000-and-up blind progression by factors of ten when needed, keeps levels with a small blind of at least twice the smallest chip and a big blind of at most 10% of the starting chips in play, then gives levels and breaks equal durations rounded to whole minutes (at least one minute). If the resulting duration is under 10 minutes, it halves the starting stack once and recalculates. The total may differ from the requested time.
-- **Level statistics:** The editor calculates statistics live below the blind schedule, excluding breaks. Starting stack in big blinds uses the first blind level, even when the schedule begins with a break; stacks below 50 or at least 200 big blinds are highlighted. Average big-blind growth is the arithmetic mean of percentage changes between consecutive blind levels. Aggressiveness is average growth divided by average blind-level duration in minutes, shown as percent big-blind growth per minute. Its evaluation uses the unrounded value: Slow at 2% or less, Balanced above 2% and below 4%, and Fast at 4% or more. The starting-stack multiple, growth, and aggressiveness are displayed as locale-formatted whole numbers; unavailable calculations are shown as not set.
-- **Structure Supports:** The minimum number of buy-ins needed to reach ten times the final big blind in chips, assuming no rebuys or add-ons. The result is rounded up to a whole player and ignores trailing breaks.
-- **Copy structures:** Duplicate a structure's configuration without carrying over timer state, entry counts, bustouts, or payouts.
-- **Tournament tracking:** Record entries and bustouts, calculate prize pools and chips in play, configure payouts, and estimate table assignments. The maximum players per table defaults to 9, including when set to zero. The percentage of the field paid is based on buy-ins, not rebuys or add-ons; all enabled contributions still count toward the prize pool. Long payout lists scroll within the table while its headings and total remain visible.
-- **CSV export:** Use **Export CSVs** on a tournament structure to create separate structure and results files. Results include entries, bustouts, payouts, entry costs, chipstacks, contributions by entry type, and total prize pool and chips in play. Disabled rebuys and add-ons remain in the recorded entries but do not contribute to totals.
-- **Participant records:** Buy-ins, rebuys, add-ons, and bustouts are stored as individual records named `Unnamed` with Unix-millisecond timestamps. Adjust bustouts using the spinner or arrow keys rather than typing a count; each adjustment immediately records or removes the relevant bustouts, even while the control remains focused. Other valid count changes immediately update calculated values, with records added or removed when the field loses focus. Counts are limited to 100,000 per category. Update all devices sharing a settings file before editing migrated data.
-- **Bustout details:** Bustouts are stored newest first. New bustouts capture the current small blind, big blind and ante, elapsed whole seconds excluding breaks, place based on buy-ins and prior bustouts, and a `null` points placeholder. During breaks, bustouts use the preceding timed blind level, if any; after the schedule ends, they use the last timed blind level and elapsed time continues to accrue. Bustouts added in one adjustment share the same time and blinds and receive consecutive places; separate adjustments record their own details. Existing bustouts have `null` details when their original information is unavailable; places are recorded at bustout time and do not change if the buy-in count changes later.
-- **Bustout payouts:** Each bustout's `payout` follows the current paytable for its recorded place, including manual overrides. Unpaid places receive zero.
-- **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed.
-- **Keep-awake support:** Keep the display and system awake while the timer is visible.
-- **Update notifications:** At startup, the app checks GitHub for a newer published release and offers a link to the downloads page. Updates are installed manually; an unavailable connection does not prevent the app from starting.
 
 ## History
 
@@ -91,7 +131,7 @@ If you find DinkyDonk useful, please consider supporting its author on [Buy Me a
 
 Copyright (C) 2026 Brian Sayles.
 
-DinkyDonk is licensed under the [GNU Affero General public License, version 3 or later](./LICENSE) (AGPL-3.0-or-later).
+DinkyDonk is licensed under the [GNU Affero General assets License, version 3 or later](public/LICENSE) (AGPL-3.0-or-later).
 
 ## Development
 
