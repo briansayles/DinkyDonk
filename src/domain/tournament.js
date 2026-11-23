@@ -640,23 +640,25 @@ export function formatChipNumber(value) {
   return formatAmount(value);
 }
 
+export function formatChipDenomination(value) {
+  const numericValue = Number(value);
+  if (numericValue < 1_000) {
+    return formatChipNumber(value);
+  }
+  if (numericValue < 1_000_000) {
+    return `${formatChipNumber(numericValue / 1_000).trimEnd()}k`;
+  }
+  return `${formatChipNumber(numericValue / 1_000_000).trimEnd()}M`;
+}
+
 export function formatBlinds(smallBlind, bigBlind, ante) {
   const small = Number(smallBlind ?? 0);
   const big = Number(bigBlind ?? 0);
   const anteValue = Number(ante ?? 0);
-  const formatBlindValue = (value) => {
-    if (value < 1_000) {
-      return formatChipNumber(value);
-    }
-    if (value < 1_000_000) {
-      return `${formatChipNumber(value / 1_000).trimEnd()}k`;
-    }
-    return `${formatChipNumber(value / 1_000_000).trimEnd()}M`;
-  };
-  const blindText = `${formatBlindValue(small)}/${formatBlindValue(big)}`;
+  const blindText = `${formatChipDenomination(small)}/${formatChipDenomination(big)}`;
 
   return anteValue > 0
-    ? `${blindText} + ${formatBlindValue(anteValue)}`
+    ? `${blindText} + ${formatChipDenomination(anteValue)}`
     : blindText;
 }
 

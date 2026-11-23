@@ -157,33 +157,13 @@ export default function TournamentList({
                       </div>
                       {isExpanded && (
                         <div className="tournament-card-content">
-                      <h4 className="tournament-card-section-title">Costs</h4>
-                      <dl className="tournament-details">
-                        <div>
-                          <dt>Starting Chipstack</dt>
-                          <dd>{tournament.startingChipstack ?? "Not set"}</dd>
-                        </div>
-                        <div>
-                          <dt>Rebuy Chipstack</dt>
-                          <dd>{tournament.rebuyChipstack ?? "Not set"}</dd>
-                        </div>
-                        <div>
-                          <dt>Addon Chipstack</dt>
-                          <dd>{tournament.addonChipstack ?? "Not set"}</dd>
-                        </div>
-                        <div>
-                          <dt>Rebuys Allowed?</dt>
-                          <dd>{tournament.rebuysAllowed ? "Yes" : "No"}</dd>
-                        </div>
-                        <div>
-                          <dt>Addons Allowed?</dt>
-                          <dd>{tournament.addonsAllowed ? "Yes" : "No"}</dd>
-                        </div>
+                        <h4 className="tournament-card-section-title">Costs</h4>
+                        <dl className="tournament-details">
                         <div>
                           <dt>Buyin Cost</dt>
                           <dd>
                             {tournament.buyinCost == null
-                              ? "Not set"
+                              ? ""
                               : formatCurrency(tournament.buyinCost)}
                             {tournament.buyinDescription && (
                               <span className="tournament-cost-description">
@@ -193,10 +173,39 @@ export default function TournamentList({
                           </dd>
                         </div>
                         <div>
+                          <dt>Buyin Chipstack</dt>
+                          <dd>{tournament.startingChipstack == null ? "" : formatChipNumber(tournament.startingChipstack)}</dd>
+                        </div>
+                        <div>
+                          <dt>Addons Allowed?</dt>
+                          <dd>{tournament.addonsAllowed ? "Yes" : "No"}</dd>
+                        </div>
+                        <div>
+                          <dt>Addon Cost</dt>
+                          <dd>
+                            {tournament.addonCost == null
+                              ? ""
+                              : formatCurrency(tournament.addonCost)}
+                            {tournament.addonDescription && (
+                              <span className="tournament-cost-description">
+                                {tournament.addonDescription}
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Addon Chipstack</dt>
+                          <dd>{tournament.addonChipstack == null ? "" : formatChipNumber(tournament.addonChipstack)}</dd>
+                        </div>
+                        <div>
+                          <dt>Rebuys Allowed?</dt>
+                          <dd>{tournament.rebuysAllowed ? "Yes" : "No"}</dd>
+                        </div>
+                        <div>
                           <dt>Rebuy Cost</dt>
                           <dd>
                             {tournament.rebuyCost == null
-                              ? "Not set"
+                              ? ""
                               : formatCurrency(tournament.rebuyCost)}
                             {tournament.rebuyDescription && (
                               <span className="tournament-cost-description">
@@ -206,17 +215,8 @@ export default function TournamentList({
                           </dd>
                         </div>
                         <div>
-                          <dt>Addon Cost</dt>
-                          <dd>
-                            {tournament.addonCost == null
-                              ? "Not set"
-                              : formatCurrency(tournament.addonCost)}
-                            {tournament.addonDescription && (
-                              <span className="tournament-cost-description">
-                                {tournament.addonDescription}
-                              </span>
-                            )}
-                          </dd>
+                          <dt>Rebuy Chipstack</dt>
+                          <dd>{tournament.rebuyChipstack == null ? "" : formatChipNumber(tournament.rebuyChipstack)}</dd>
                         </div>
                       </dl>
                       <div className="tournament-chips">

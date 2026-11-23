@@ -256,6 +256,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.timer-tab-panel.timer-cursor-hidden,
+.timer-tab-panel.timer-cursor-hidden * {
+  cursor: none !important;
+}
+
 .timer-tab-panel-active {
   color: #fff;
   animation:
@@ -1397,7 +1402,10 @@
 }
 
 @keyframes timer-message-fade {
-  0%,
+  0% {
+    opacity: 1;
+  }
+
   100% {
     opacity: 0;
   }

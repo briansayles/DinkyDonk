@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import {
   formatBlinds,
+  formatChipDenomination,
   formatChipNumber,
   formatClock,
   normalizeEdgeSpotQuantity,
@@ -66,11 +67,11 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
       onAnimationEnd={(event) => onAnimationEnd(chip.key, event.animationName)}
       role="img"
       aria-hidden={chip.isExiting}
-      aria-label={`${formatChipNumber(chip.denomination)} chip`}
+      aria-label={`${formatChipDenomination(chip.denomination)} chip`}
       title="Double-click to edit chip settings"
       onDoubleClick={onDoubleClick}
     >
-      {formatChipNumber(chip.denomination)}
+      {formatChipDenomination(chip.denomination)}
     </div>
   );
 }

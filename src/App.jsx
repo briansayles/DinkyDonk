@@ -153,6 +153,7 @@ function GuidedTournamentReview({ tournament, onAccept, onStartOver, saving, err
 
 function App() {
   const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [timerCursorHidden, setTimerCursorHidden] = useState(false);
   const [runUserTour, setRunUserTour] = useState(false);
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashExiting, setSplashExiting] = useState(false);
@@ -1069,6 +1070,31 @@ function App() {
     previousTimerFullscreenRef.current = timerIsFullscreen;
   }, [activeTab, timerIsFullscreen]);
 
+  useEffect(() => {
+    const timerPanel = timerPanelRef.current;
+    setTimerCursorHidden(false);
+    if (activeTab !== "Timer" || !timerPanel) {
+      return;
+    }
+
+    let hideCursorTimeout;
+    const showCursorAndRestartTimeout = () => {
+      setTimerCursorHidden(false);
+      window.clearTimeout(hideCursorTimeout);
+      hideCursorTimeout = window.setTimeout(
+        () => setTimerCursorHidden(true),
+        5000,
+      );
+    };
+
+    timerPanel.addEventListener("pointermove", showCursorAndRestartTimeout);
+    showCursorAndRestartTimeout();
+    return () => {
+      timerPanel.removeEventListener("pointermove", showCursorAndRestartTimeout);
+      window.clearTimeout(hideCursorTimeout);
+    };
+  }, [activeTab, timerPanelRef]);
+
   const payoutTotal = activeTournament
     ? payouts.reduce((total, payout) => total + payout, 0)
     : 0;
@@ -1325,7 +1351,7 @@ function App() {
       <section
         ref={timerPanelRef}
         id="active-panel"
-        className={`tab-panel${activeTab === "Timer" ? ` timer-tab-panel${startedAt !== null ? " timer-tab-panel-active" : ""}` : ""}`}
+        className={`tab-panel${activeTab === "Timer" ? ` timer-tab-panel${startedAt !== null ? " timer-tab-panel-active" : ""}${timerCursorHidden ? " timer-cursor-hidden" : ""}` : ""}`}
         role={activeTab === "Timer" ? "region" : "tabpanel"}
         aria-label={activeTab === "Timer" ? "Tournament timer" : undefined}
         aria-labelledby={

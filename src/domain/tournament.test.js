@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { chipStackMatchesStarting, createGuidedTournamentStructure, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, normalizeMaxPlayersPerTable, sortLevels, updateBustoutPayouts } from "./tournament.js";
+import { chipStackMatchesStarting, createGuidedTournamentStructure, formatChipDenomination, formatChipNumber, formatChipStackTotal, getAggressivenessEvaluation, getCurrentLevel, getCurrentOrLastLevel, getEffectivePayouts, getLevelStatistics, getPayoutTimerMessage, getStartingBigBlindMultiple, getStructureSupportedPlayers, hasLargeLevelChange, hasSmallLevelChange, normalizeMaxPlayersPerTable, sortLevels, updateBustoutPayouts } from "./tournament.js";
 
 test("guided setup retains only template chips at or above the selected denomination", () => {
   const chips = [
@@ -417,6 +417,20 @@ test("per-player stack matches the displayed total even with unused chips", () =
   assert.equal(chipStackMatchesStarting(chips, "invalid"), false);
   assert.equal(chipStackMatchesStarting([{ denomination: 25, quantityPerPlayer: "" }], "0"), false);
   assert.equal(chipStackMatchesStarting([{ denomination: 25, quantityPerPlayer: 0 }], "0"), true);
+});
+
+test("chip denominations use k and M suffixes", () => {
+  assert.equal(formatChipDenomination(999), formatChipNumber(999));
+  assert.equal(formatChipDenomination(1_000), "1k");
+  assert.equal(
+    formatChipDenomination(1_500),
+    `${formatChipNumber(1.5).trimEnd()}k`,
+  );
+  assert.equal(formatChipDenomination(1_000_000), "1M");
+  assert.equal(
+    formatChipDenomination(1_500_000),
+    `${formatChipNumber(1.5).trimEnd()}M`,
+  );
 });
 
 test("calculated payouts use the player count while preserving manual overrides", () => {

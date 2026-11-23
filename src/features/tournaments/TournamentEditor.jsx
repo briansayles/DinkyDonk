@@ -113,7 +113,6 @@ export default function TournamentEditor({
                     required
                   />
                 </label>
-
                 <div className="tournament-details-fields">
                   <div className="tournament-cost-field">
                     <span
@@ -180,65 +179,6 @@ export default function TournamentEditor({
                       />
                     </label>
                   </div>
-                  <div className="tournament-cost-field" id="edit-entry-rebuy">
-                    <label className="tournament-flag form-field">
-                      <span>Rebuys Allowed?</span>
-                      <input
-                        type="checkbox"
-                        checked={draft.rebuysAllowed}
-                        disabled={saving}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            rebuysAllowed: event.target.checked,
-                          }))
-                        }
-                      />
-                      </label>
-                    <label className="form-field">
-                      Rebuy Cost
-                      <CurrencyInput
-                        value={draft.rebuyCost}
-                        disabled={saving || !draft.rebuysAllowed}
-                        onChange={(value) =>
-                          setDraft((current) => ({
-                            ...current,
-                            rebuyCost: value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="form-field">
-                      Rebuy Chipstack
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={draft.rebuyChipstack}
-                        disabled={saving || !draft.rebuysAllowed}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            rebuyChipstack: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="form-field">
-                      Rebuy description (optional)
-                      <textarea
-                        rows="2"
-                        value={draft.rebuyDescription}
-                        disabled={saving || !draft.rebuysAllowed}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            rebuyDescription: event.target.value,
-                          }))
-                        }
-                      />
-                    </label>
-                  </div>
                   <div className="tournament-cost-field" id="edit-entry-addon">
                     <label className="tournament-flag form-field">
                       <span>Addons Allowed?</span>
@@ -298,8 +238,66 @@ export default function TournamentEditor({
                       />
                     </label>
                   </div>
+                  <div className="tournament-cost-field" id="edit-entry-rebuy">
+                    <label className="tournament-flag form-field">
+                      <span>Rebuys Allowed?</span>
+                      <input
+                        type="checkbox"
+                        checked={draft.rebuysAllowed}
+                        disabled={saving}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            rebuysAllowed: event.target.checked,
+                          }))
+                        }
+                      />
+                      </label>
+                    <label className="form-field">
+                      Rebuy Cost
+                      <CurrencyInput
+                        value={draft.rebuyCost}
+                        disabled={saving || !draft.rebuysAllowed}
+                        onChange={(value) =>
+                          setDraft((current) => ({
+                            ...current,
+                            rebuyCost: value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      Rebuy Chipstack
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={draft.rebuyChipstack}
+                        disabled={saving || !draft.rebuysAllowed}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            rebuyChipstack: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="form-field">
+                      Rebuy description (optional)
+                      <textarea
+                        rows="2"
+                        value={draft.rebuyDescription}
+                        disabled={saving || !draft.rebuysAllowed}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            rebuyDescription: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
                 </div>
-
                 <hr className="tournament-details-divider" />
 
                 <section id="edit-entry-payout">
