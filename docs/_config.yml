@@ -1,3 +1,28 @@
-remote_theme: pages-themes/cayman@v0.2.0
-plugins:
-- jekyll-remote-theme # add this line to the plugins list if you already have one
+# ----------------------- #
+#      Main Configs       #
+# ----------------------- #
+
+url: https://briansayles.github.io/DinkyDonk
+title: DinkyDonk Poker Tournament Manager and Timer
+email: brian.sayles.pe@icloud.com
+author: Brian Sayles
+description: > # "Write an awesome description for your new site here. 
+  DinkyDonk Poker Tournament Manager and Timer for organizing and timing poker tournaments efficiently.
+copyright: 'Copyright &copy; 2026 Brian Sayles. All Rights Reserved.'
+credits: 'Credits: Landing Page is a free to use, open source Bootstrap theme created by <a href="http://startbootstrap.com/">Start Bootstrap</a>.'
+
+# ----------------------- #
+#    Jekyll & Plugins     #
+# ----------------------- #
+
+# Build settings
+markdown: kramdown
+permalink: pretty
+
+# ----------------------- #
+#   3rd Party Settings    #
+# ----------------------- #
+
+social:
+  - title: github
+    url: https://github.com/briansayles/DinkyDonk
