@@ -29,12 +29,12 @@
   5. Aggressiveness, defined as average percent big blind increase per minute, and
   6. Aggressiveness evaluation: Slow, Balanced or Fast
 - **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed
-- **Your Data is Private:** All settings and tournament data are stored in JSON file(s) on your local machine, local network drive, or your own cloud-accessible storage, meaning:
+- **Your Data is Private:** All settings and tournament data are stored in a SQLite database on your local machine, meaning:
   1. The program does not need an internet connection to run,
   2. The program is not dependent on a remote server/database
   3. Your data is yours and yours alone...nothing gets shared outside of your control
   4. There is nothing you need to log into
-  5. **You CAN share the data with multiple instances of the program running on the same or even different computers, which supports displaying the synchronized timer on multiple displays**
+  5. The read-only network viewer can display the timer on other devices without sharing the database file.
 - **Tournament Timer / Manager:** 
   1. Run timed blind levels and breaks (play/pause, restart level, jump back/forward a level, and reset controls on screen),
   2. Shows current and upcoming blinds that are nicely animated when they change,
@@ -62,7 +62,9 @@ If the paytable is allowed to be over-ridden, it can be edited on the timer scre
 - **Tables Management** The program doesn't currently support tracking players individually, so table/seat assignments aren't feasible, but the program does show the number of tables needed with x players and x-1 players in order to be balanced, given the maximum players per table entered on the timer screen
 - **Tournament Tracking:** All entries and bustouts are timestamped and recorded with pertinent details such as the elapsed tournament time and blinds at the time of bustout
 - **CSV export:** Use **Export CSVs** on a tournament structure to create separate structure and results files that can be imported into 3rd party programs or services
-- **Updates:** At startup, the app checks GitHub for a newer published release which can be downloaded from the project's GitHub page and installed without affecting any existing tournaments or data
+- **Updates:** At startup, the app checks GitHub for a newer published release.
+- **Local network timer viewer:** Open the active tournament's live timer in a browser on another device, without installing the desktop app on that device.
+- **Local tournament director:** Control the active tournament from a browser on the same network.
 
 ## Screenshots
 
@@ -100,6 +102,28 @@ Visit the [Releases Page](https://github.com/briansayles/DinkyDonk/releases) to 
 
 DinkyDonk is not yet code-signed on Windows and not yet notarized by Apple on macOS, so both may show a warning when you open the app for the first time. 
 Note that this project is open source, so the full source code is available at the project's [GitHub Repository](https://github.com/briansayles/DinkyDonk) for you and anyone else to review.
+
+### Local storage
+
+The database is created in the operating system's local app-data directory; its full path is shown in Settings. Existing JSON settings files are not imported, modified, or deleted. The database starts empty, and selecting a shared settings file is no longer supported. Tournament and timer-settings changes are transactional. Edits to different tournaments can be saved independently; stale edits to the same tournament or settings are rejected. After a conflict, review the latest data and retry.
+
+### Viewing the timer on the local network
+
+With DinkyDonk running, select an active tournament and open **Settings → Local network timer viewer**. On a device connected to the same IPv4 network, open one of the displayed HTTP addresses in a browser. The browser view is read-only and updates automatically; controls and alarms remain on the desktop app. The computer's firewall may need to allow incoming connections. Refresh the displayed addresses if the network changes; the port can change each time the app starts.
+
+In the tournament list, the active tournament has a green border. A tournament's globe button makes it active and opens the network viewer in the desktop's default browser.
+
+The network viewer displays a QR code that another device on the same network can scan to open the same address. Open the viewer using a network address, rather than localhost, to generate a shareable code.
+
+The viewer starts automatically and does not use a password or encryption. Anyone who can reach the computer and port can see the active tournament's name, blinds, chips, timer, and aggregate entry, prize and payout information. Individual participant records are not sent. Only use it on a trusted network; firewall rules determine which devices can connect. The viewer stops when the desktop app exits.
+
+### Controlling the tournament on the local network
+
+Append `/td` to a displayed network address (for example, `http://192.168.1.10:60884/td`) to open the tournament director. It controls the active tournament's timer, entries, bustouts, tables, payouts, and alarm volume. Changes use the same local database and stale edits are rejected; review the refreshed data and retry if a conflict is reported. Timer alarms continue to play on the desktop.
+
+Use the count spinner buttons (or arrow keys) to adjust buy-ins and bustouts; direct typing is disabled for those counts.
+
+**The director has no password and uses unencrypted HTTP. Anyone who can reach the port can control the tournament and read the active tournament's participant records.** Use it only on a trusted network and restrict access with firewall rules.
 
 ### Windows
 
@@ -141,6 +165,8 @@ Install dependencies, then run the frontend development server:
 yarn install
 yarn dev
 ```
+
+The network viewer and director use the built frontend assets even in desktop development mode. `yarn tauri dev` builds them before starting; after editing them or shared timer code, restart it to rebuild the assets.
 
 Build the frontend:
 

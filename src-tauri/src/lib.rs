@@ -1,14 +1,22 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::path::Path;
+use std::path::PathBuf;
+#[cfg(test)]
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::sync::{
     Mutex,
     mpsc::{self, Sender},
 };
 use tauri::{Manager, State};
+use tauri_plugin_deep_link::DeepLinkExt;
+
+mod network_viewer;
+mod storage;
 
 const DEFAULT_TOURNAMENT_ID: &str = "3bd8977a-a9fb-4b68-a2fb-f4cc8cb199d2";
+#[cfg(test)]
 const LEGACY_DEFAULT_TOURNAMENT_ID: &str = "my-first-dinkydonk-tournament";
 
 #[derive(Default)]
@@ -419,22 +427,7 @@ fn default_countdown_warning_announcement() -> String {
     "{seconds} seconds remaining.".to_string()
 }
 
-fn default_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|error| format!("Could not find app data directory: {error}"))?;
-
-    fs::create_dir_all(&data_dir)
-        .map_err(|error| format!("Could not create app data directory: {error}"))?;
-
-    Ok(data_dir)
-}
-
-fn settings_directory_config_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(default_data_dir(app)?.join("settings-directory.json"))
-}
-
+#[cfg(test)]
 fn configured_data_file_from_config(config_path: &Path, default_dir: &Path) -> Result<PathBuf, String> {
     if !config_path.exists() {
         return Ok(app_data_file_path(default_dir));
@@ -457,20 +450,19 @@ fn configured_data_file_from_config(config_path: &Path, default_dir: &Path) -> R
     Ok(path)
 }
 
-fn configured_data_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    configured_data_file_from_config(&settings_directory_config_path(app)?, &default_data_dir(app)?)
-}
-
+#[cfg(test)]
 fn app_data_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join("DinkyDonk.JSON")
 }
 
+#[cfg(test)]
 fn has_json_extension(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
 }
 
+#[cfg(test)]
 fn parse_app_data(contents: &str) -> Result<(AppData, serde_json::Value, bool), String> {
     let mut json: serde_json::Value = serde_json::from_str(contents)
         .map_err(|error| format!("Could not parse settings file: {error}"))?;
@@ -482,6 +474,7 @@ fn parse_app_data(contents: &str) -> Result<(AppData, serde_json::Value, bool), 
     Ok((data, json, migrated))
 }
 
+#[cfg(test)]
 fn read_app_data_from_file(path: &Path) -> Result<AppData, String> {
     if !path.exists() {
         return Ok(AppData::default());
@@ -499,6 +492,7 @@ fn read_app_data_from_file(path: &Path) -> Result<AppData, String> {
     Ok(data)
 }
 
+#[cfg(test)]
 fn add_missing_bustout_payouts(data: &mut serde_json::Value) -> bool {
     let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
         return false;
@@ -519,6 +513,7 @@ fn add_missing_bustout_payouts(data: &mut serde_json::Value) -> bool {
     changed
 }
 
+#[cfg(test)]
 fn migrate_bustout_order(data: &mut serde_json::Value) -> Result<bool, String> {
     let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
         return Ok(false);
@@ -544,6 +539,7 @@ fn migrate_bustout_order(data: &mut serde_json::Value) -> Result<bool, String> {
     Ok(changed)
 }
 
+#[cfg(test)]
 fn migrate_legacy_counts(data: &mut serde_json::Value) -> Result<bool, String> {
     let Some(tournaments) = data.get_mut("tournaments").and_then(|value| value.as_array_mut()) else {
         return Ok(false);
@@ -593,6 +589,7 @@ fn migrate_legacy_counts(data: &mut serde_json::Value) -> Result<bool, String> {
     Ok(changed)
 }
 
+#[cfg(test)]
 fn write_app_data_to_file(path: &Path, data: &AppData) -> Result<(), String> {
     let contents = serde_json::to_string_pretty(data)
         .map_err(|error| format!("Could not encode settings file: {error}"))?;
@@ -601,13 +598,18 @@ fn write_app_data_to_file(path: &Path, data: &AppData) -> Result<(), String> {
 }
 
 fn read_app_data(app: &tauri::AppHandle) -> Result<AppData, String> {
-    read_app_data_from_file(&configured_data_file(app)?)
+    storage::load(&mut storage::open(&database_path(app)?)?)
 }
 
-fn write_app_data(app: &tauri::AppHandle, data: &AppData) -> Result<(), String> {
-    write_app_data_to_file(&configured_data_file(app)?, data)
+fn database_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let directory = app.path().app_local_data_dir()
+        .map_err(|error| format!("Could not find local app data directory: {error}"))?;
+    fs::create_dir_all(&directory)
+        .map_err(|error| format!("Could not create local app data directory: {error}"))?;
+    Ok(directory.join("DinkyDonk.sqlite3"))
 }
 
+#[cfg(test)]
 fn migrate_legacy_default_tournament_id(data: &mut AppData) -> bool {
     let mut changed = false;
     for tournament in &mut data.tournaments {
@@ -626,95 +628,13 @@ fn migrate_legacy_default_tournament_id(data: &mut AppData) -> bool {
 }
 
 #[tauri::command]
-fn get_settings_file(
+fn get_database_path(
     app: tauri::AppHandle,
-    persistence: State<'_, PersistenceLock>,
 ) -> Result<String, String> {
-    let _guard = persistence
-        .0
-        .lock()
-        .map_err(|error| format!("Could not lock app data: {error}"))?;
-    Ok(configured_data_file(&app)?.to_string_lossy().into_owned())
+    Ok(database_path(&app)?.to_string_lossy().into_owned())
 }
 
-#[derive(Serialize)]
-struct SettingsFilePickerResult {
-    supported: bool,
-    path: Option<String>,
-}
-
-#[tauri::command(rename_all = "camelCase")]
-async fn pick_settings_file(
-    _window: tauri::WebviewWindow,
-    default_path: String,
-) -> Result<SettingsFilePickerResult, String> {
-    #[cfg(windows)]
-    {
-        let owner = _window.hwnd()
-            .map_err(|error| format!("Could not find the settings window: {error}"))?.0 as isize;
-        let path = tauri::async_runtime::spawn_blocking(move || {
-            pick_settings_file_on_windows(owner, &default_path)
-        }).await.map_err(|error| format!("Could not run settings file picker: {error}"))??;
-        Ok(SettingsFilePickerResult { supported: true, path })
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = default_path;
-        Ok(SettingsFilePickerResult { supported: false, path: None })
-    }
-}
-
-#[cfg(windows)]
-fn pick_settings_file_on_windows(owner: isize, default_path: &str) -> Result<Option<String>, String> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows::{
-        core::{PCWSTR, w},
-        Win32::{
-            Foundation::{ERROR_CANCELLED, HWND},
-            System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CoUninitialize, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED},
-            UI::Shell::{Common::COMDLG_FILTERSPEC, FileOpenDialog, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM, IFileOpenDialog, IShellItem, SHCreateItemFromParsingName, SIGDN_FILESYSPATH},
-        },
-    };
-
-    unsafe {
-        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()
-            .map_err(|error| format!("Could not initialize file picker: {error}"))?;
-        let result = (|| -> windows::core::Result<Option<String>> {
-            let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER)?;
-            // The Open dialog normally rejects new filenames before the app can create them.
-            dialog.SetOptions((dialog.GetOptions()? & !FOS_FILEMUSTEXIST) | FOS_FORCEFILESYSTEM)?;
-            dialog.SetTitle(w!("Choose settings file"))?;
-            dialog.SetFileTypes(&[COMDLG_FILTERSPEC {
-                pszName: w!("JSON files"),
-                pszSpec: w!("*.json"),
-            }])?;
-            dialog.SetDefaultExtension(w!("json"))?;
-            let path = Path::new(default_path);
-            if let Some(parent) = path.parent().filter(|parent| parent.is_dir()) {
-                let wide_parent: Vec<u16> = parent.as_os_str().encode_wide().chain(Some(0)).collect();
-                let folder: IShellItem = SHCreateItemFromParsingName(PCWSTR(wide_parent.as_ptr()), None)?;
-                dialog.SetFolder(&folder)?;
-            }
-            if let Some(name) = path.file_name() {
-                let wide_name: Vec<u16> = name.encode_wide().chain(Some(0)).collect();
-                dialog.SetFileName(PCWSTR(wide_name.as_ptr()))?;
-            }
-            match dialog.Show(Some(HWND(owner as *mut std::ffi::c_void))) {
-                Ok(()) => {}
-                Err(error) if error.code() == ERROR_CANCELLED.to_hresult() => return Ok(None),
-                Err(error) => return Err(error),
-            }
-            let item = dialog.GetResult()?;
-            let name = item.GetDisplayName(SIGDN_FILESYSPATH)?;
-            let path = name.to_string();
-            CoTaskMemFree(Some(name.0.cast()));
-            Ok(Some(path?))
-        })();
-        CoUninitialize();
-        result.map_err(|error| format!("Could not choose settings file: {error}"))
-    }
-}
-
+#[cfg(test)]
 fn select_settings_file(path: &Path, config_path: &Path) -> Result<PathBuf, String> {
     if !has_json_extension(path) {
         return Err("The settings file must have a .json extension.".to_string());
@@ -745,22 +665,7 @@ fn select_settings_file(path: &Path, config_path: &Path) -> Result<PathBuf, Stri
     Ok(selected_file)
 }
 
-#[tauri::command(rename_all = "camelCase")]
-fn set_settings_file(
-    app: tauri::AppHandle,
-    path: String,
-    persistence: State<'_, PersistenceLock>,
-) -> Result<String, String> {
-    let _guard = persistence.0.lock()
-        .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let selected = select_or_create_settings_file(
-        Path::new(&path),
-        &configured_data_file(&app)?,
-        &settings_directory_config_path(&app)?,
-    )?;
-    Ok(selected.to_string_lossy().into_owned())
-}
-
+#[cfg(test)]
 fn select_or_create_settings_file(path: &Path, current_file: &Path, config_path: &Path) -> Result<PathBuf, String> {
     use std::io::Write;
 
@@ -820,9 +725,10 @@ fn load_timer_settings(
     Ok(read_app_data(&app)?.timer_settings)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 fn save_timer_settings(
     app: tauri::AppHandle,
+    expected: Option<TimerSettings>,
     settings: TimerSettings,
     persistence: State<'_, PersistenceLock>,
 ) -> Result<(), String> {
@@ -830,9 +736,11 @@ fn save_timer_settings(
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let mut data = read_app_data(&app)?;
-    data.timer_settings = Some(settings);
-    write_app_data(&app, &data)
+    storage::update_timer_settings(
+        &mut storage::open(&database_path(&app)?)?,
+        &expected,
+        &settings,
+    )
 }
 
 #[tauri::command]
@@ -844,9 +752,14 @@ fn load_tournaments(
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    load_tournaments_from_file(&configured_data_file(&app)?)
+    let data = read_app_data(&app)?;
+    let active_tournament_id = data.active_tournament_id.filter(|active_id| {
+        data.tournaments.iter().any(|tournament| tournament.id == *active_id)
+    });
+    Ok(TournamentData { tournaments: data.tournaments, active_tournament_id })
 }
 
+#[cfg(test)]
 fn load_tournaments_from_file(path: &Path) -> Result<TournamentData, String> {
     let mut data = read_app_data_from_file(path)?;
     let mut changed = migrate_legacy_default_tournament_id(&mut data);
@@ -872,23 +785,21 @@ fn load_tournaments_from_file(path: &Path) -> Result<TournamentData, String> {
 }
 
 #[tauri::command(rename_all = "camelCase")]
-fn save_tournaments(
+fn apply_tournament_changes(
     app: tauri::AppHandle,
-    tournaments: Vec<Tournament>,
-    active_tournament_id: Option<String>,
+    changes: Vec<storage::TournamentChange>,
+    active_change: Option<storage::ActiveTournamentChange>,
     persistence: State<'_, PersistenceLock>,
-) -> Result<(), String> {
+) -> Result<TournamentData, String> {
     let _guard = persistence
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let active_tournament_id = active_tournament_id.filter(|active_id| {
-        tournaments.iter().any(|tournament| tournament.id == *active_id)
-    });
-    let mut data = read_app_data(&app)?;
-    data.tournaments = tournaments;
-    data.active_tournament_id = active_tournament_id;
-    write_app_data(&app, &data)
+    storage::apply_changes(
+        &mut storage::open(&database_path(&app)?)?,
+        &changes,
+        active_change.as_ref(),
+    )
 }
 
 fn apply_bustout_payouts(
@@ -930,12 +841,11 @@ fn reconcile_bustout_payouts(
         .0
         .lock()
         .map_err(|error| format!("Could not lock app data: {error}"))?;
-    let mut data = read_app_data(&app)?;
-    if !apply_bustout_payouts(&mut data, &expected_tournaments, &bustout_payouts)? {
-        return Ok(false);
-    }
-    write_app_data(&app, &data)?;
-    Ok(true)
+    storage::reconcile(
+        &mut storage::open(&database_path(&app)?)?,
+        &expected_tournaments,
+        &bustout_payouts,
+    )
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -947,7 +857,34 @@ pub fn run() {
         .manage(KeepAwakeController {
             sender: keep_awake_sender,
         })
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .invoke_handler(tauri::generate_handler![
+            set_keep_awake,
+            get_database_path,
+            get_default_tournament_structure,
+            load_tournaments,
+            apply_tournament_changes,
+            reconcile_bustout_payouts,
+            load_timer_settings,
+            save_timer_settings,
+            network_viewer::get_network_viewer_status
+        ])
         .setup(move |app| {
+            app.manage(network_viewer::start(app.handle().clone()));
+            // init(app.app_handle());
+            
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            
+            #[cfg(all(target_os = "linux", debug_assertions, windows))]
+            app.deep_link().register_all()?;
+
+            app.deep_link().on_open_url(|event| {
+                dbg!(event.urls());
+            });
+
             #[cfg(desktop)]
             {
                 let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png"))?;
@@ -972,20 +909,6 @@ pub fn run() {
                 .map_err(Box::<dyn std::error::Error>::from)?;
             Ok(())
         })
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![
-            set_keep_awake,
-            get_settings_file,
-            pick_settings_file,
-            set_settings_file,
-            get_default_tournament_structure,
-            load_tournaments,
-            save_tournaments,
-            reconcile_bustout_payouts,
-            load_timer_settings,
-            save_timer_settings
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

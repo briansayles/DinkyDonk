@@ -1,4 +1,10 @@
 import { getCurrency } from "locale-currency";
+import { formatChipNumber } from "./timerDisplay.js";
+
+export {
+  formatAmount, formatBlinds, formatChipDenomination, formatChipNumber,
+  formatClock, getCurrentLevel, getCurrentOrLastLevel, getLevelDurationMs, sortLevels,
+} from "./timerDisplay.js";
 
 const curatedBlindValues = [
   1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40, 50, 60, 80, 100, 150, 200, 
@@ -618,12 +624,6 @@ export function getAggressivenessEvaluation(aggressiveness) {
   return aggressiveness < 0.04 ? "Balanced" : "Fast";
 }
 
-export function formatAmount(value) {
-  return Number(value).toLocaleString(undefined, {
-    maximumFractionDigits: 20,
-  });
-}
-
 export function formatCurrency(value) {
   const locale = Intl.NumberFormat().resolvedOptions().locale;
   const region = new Intl.Locale(locale).maximize().region;
@@ -634,32 +634,6 @@ export function formatCurrency(value) {
     currency,
     minimumFractionDigits: 0,
   }).format(Number(value));
-}
-
-export function formatChipNumber(value) {
-  return formatAmount(value);
-}
-
-export function formatChipDenomination(value) {
-  const numericValue = Number(value);
-  if (numericValue < 1_000) {
-    return formatChipNumber(value);
-  }
-  if (numericValue < 1_000_000) {
-    return `${formatChipNumber(numericValue / 1_000).trimEnd()}k`;
-  }
-  return `${formatChipNumber(numericValue / 1_000_000).trimEnd()}M`;
-}
-
-export function formatBlinds(smallBlind, bigBlind, ante) {
-  const small = Number(smallBlind ?? 0);
-  const big = Number(bigBlind ?? 0);
-  const anteValue = Number(ante ?? 0);
-  const blindText = `${formatChipDenomination(small)}/${formatChipDenomination(big)}`;
-
-  return anteValue > 0
-    ? `${blindText} + ${formatChipDenomination(anteValue)}`
-    : blindText;
 }
 
 export function getMaxChipSupportedPlayers(chips) {
@@ -780,24 +754,6 @@ export function getChipsInUse(chips, levels, currentLevelIndex) {
     .slice(0, 5);
 }
 
-export function sortLevels(levels) {
-  const compareBlindValues = (first, second) =>
-    Number(first.smallBlind ?? 0) +
-    Number(first.bigBlind ?? 0) +
-    Number(first.ante ?? 0) -
-    (Number(second.smallBlind ?? 0) +
-      Number(second.bigBlind ?? 0) +
-      Number(second.ante ?? 0));
-  const regularLevels = levels
-    .filter((level) => !level.isBreak)
-    .map((level) => ({ ...level, isBreak: false }))
-    .sort(compareBlindValues);
-  let regularIndex = 0;
-  return levels.map((level) =>
-    level.isBreak ? { ...level, isBreak: true } : regularLevels[regularIndex++],
-  );
-}
-
 function hasLevelChange(levels, index, isLargeChange) {
   const level = levels[index];
   if (!level || level.isBreak) {
@@ -841,58 +797,4 @@ export function hasSmallLevelChange(levels, index) {
 
 export function hasLargeLevelChange(levels, index) {
   return hasLevelChange(levels, index, true);
-}
-
-export function getLevelDurationMs(level) {
-  return Math.max(0, Number(level.duration ?? 0)) * 60_000;
-}
-
-export function getCurrentLevel(levels, elapsedMs) {
-  let levelStartMs = 0;
-
-  for (let index = 0; index < levels.length; index += 1) {
-    const levelDurationMs = getLevelDurationMs(levels[index]);
-    if (levelDurationMs > 0 && elapsedMs < levelStartMs + levelDurationMs) {
-      return {
-        level: levels[index],
-        index,
-        startMs: levelStartMs,
-        endMs: levelStartMs + levelDurationMs,
-        remainingMs: levelStartMs + levelDurationMs - elapsedMs,
-      };
-    }
-    levelStartMs += levelDurationMs;
-  }
-
-  return null;
-}
-
-export function getCurrentOrLastLevel(levels, elapsedMs) {
-  const currentLevel = getCurrentLevel(levels, elapsedMs);
-  if (currentLevel) {
-    return currentLevel;
-  }
-
-  let endMs = 0;
-  let lastLevel = null;
-  for (let index = 0; index < levels.length; index += 1) {
-    const startMs = endMs;
-    endMs += getLevelDurationMs(levels[index]);
-    if (endMs > startMs) {
-      lastLevel = { level: levels[index], index, startMs, endMs, remainingMs: 0 };
-    }
-  }
-  return elapsedMs >= endMs ? lastLevel : null;
-}
-
-export function formatClock(milliseconds) {
-  const totalSeconds = Math.ceil(milliseconds / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

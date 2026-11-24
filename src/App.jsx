@@ -15,7 +15,6 @@ import {
   getEntryContributions,
   getEffectivePayouts,
   getLevelStatistics,
-  getPayoutTimerMessage,
   normalizeEdgeSpotQuantity,
   normalizeMaxPlayersPerTable,
   sortChips,
@@ -32,6 +31,7 @@ import {
 } from "./domain/participants";
 import TimerPanel, { TimerIcon } from "./features/timer/TimerPanel";
 import { useTimer } from "./features/timer/useTimer";
+import { getDisplayedTimerMessage, getTimerMessages } from "./features/timer/timerMessages";
 import { useTournaments } from "./features/tournaments/useTournaments";
 import AboutPanel from "./features/about/AboutPanel";
 import { checkForNewRelease, releasesPageUrl } from "./features/about/releaseCheck";
@@ -160,6 +160,7 @@ function App() {
   const [minimumSplashTimeElapsed, setMinimumSplashTimeElapsed] =
     useState(false);
   const [editingId, setEditingId] = useState(null);
+  const editingTournamentBaseRef = useRef(null);
   const [creatingStructure, setCreatingStructure] = useState(false);
   const [structureCreationError, setStructureCreationError] = useState("");
   const deleteDialogRef = useRef(null);
@@ -188,18 +189,21 @@ function App() {
   const [tablesCollapsed, setTablesCollapsed] = useState(false);
   const [tournamentExportError, setTournamentExportError] = useState("");
   const [tournamentExportNotice, setTournamentExportNotice] = useState("");
+  const [viewerOpenError, setViewerOpenError] = useState("");
   const [newRelease, setNewRelease] = useState(null);
   const [releaseLinkError, setReleaseLinkError] = useState("");
   const tournamentState = useTournaments();
   const {
     activeTournament,
     activeTournamentId,
+    beginTournamentFieldEdit,
+    clearTournamentFieldEdits,
     copyTournament,
     deleteTournament: removeTournament,
     entryCountDrafts,
+    endTournamentFieldEdit,
     expandedTournamentId,
     loadingTournaments,
-    loadTournaments,
     persistTournamentData,
     payoutDrafts,
     payoutPlaceDrafts,
@@ -222,15 +226,22 @@ function App() {
     updateTournamentTimer,
   } = tournamentState;
   const {
-    changingSettingsDirectory,
-    changeSettingsFile,
+    databasePath,
+    reloadTimerSettings,
+    settingsConflict,
+    settingsReloading,
     setTimerSettings,
     setTimerSettingsError,
-    settingsDirectory,
     timerSettings,
     timerSettingsError,
     timerSettingsLoaded,
-  } = useTimerSettings(loadTournaments, flushTournamentFieldUpdates);
+  } = useTimerSettings();
+
+  useEffect(() => () => clearTournamentFieldEdits(), [
+    activeTab,
+    activeTournamentId,
+    clearTournamentFieldEdits,
+  ]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -645,6 +656,7 @@ function App() {
 
   function editTournament(tournament) {
     setStructureCreationError("");
+    editingTournamentBaseRef.current = tournament;
     setEditingId(tournament.id);
     setDraft(createTournamentDraft(tournament));
   }
@@ -664,6 +676,24 @@ function App() {
     timer.enterTimerFullscreen();
     if (await persistTournamentData(tournaments, tournamentId)) {
       setActiveTab("Timer");
+    }
+  }
+
+  async function openTournamentViewer(tournamentId) {
+    setViewerOpenError("");
+    if (!await persistTournamentData(tournaments, tournamentId, tournaments, activeTournamentId, true)) {
+      return;
+    }
+    try {
+      const connection = await invoke("get_network_viewer_status");
+      if (connection.error) throw new Error(connection.error);
+      if (!connection.urls.length) {
+        throw new Error("No network address is available. Connect to a network and try again.");
+      }
+      await openUrl(connection.urls[0]);
+    } catch (error) {
+      console.error("Could not open the network viewer.", error);
+      setViewerOpenError(`Could not open the network viewer: ${error}`);
     }
   }
 
@@ -787,9 +817,10 @@ function App() {
       ? tournaments.find((item) => item.id === editingId)
       : null;
     const tournament = tournamentFromDraft(draft, editingId, existingTournament);
-    if (await saveTournamentData(tournament, editingId)) {
+    if (await saveTournamentData(tournament, editingId, editingTournamentBaseRef.current)) {
       setDraft(null);
       setEditingId(null);
+      editingTournamentBaseRef.current = null;
     }
   }
 
@@ -801,7 +832,7 @@ function App() {
     }
     setStructureCreationError("");
     setDeleteError("");
-    setPendingDeletion({ id: tournament.id, name: tournament.name });
+    setPendingDeletion({ id: tournament.id, name: tournament.name, tournament });
   }
 
   function cancelTournamentDeletion() {
@@ -817,8 +848,8 @@ function App() {
     setDeleting(true);
     setDeleteError("");
     try {
-      if (!(await removeTournament(pendingDeletion.id))) {
-        setDeleteError("The tournament could not be deleted. Please try again.");
+      if (!(await removeTournament(pendingDeletion.id, pendingDeletion.tournament))) {
+        setDeleteError("The tournament could not be deleted. It may have changed; close this dialog and review it before trying again.");
         return;
       }
       deleteDialogRef.current.close();
@@ -848,18 +879,18 @@ function App() {
           enabled: true,
         },
         {
-          label: "Rebuys",
-          countField: "rebuyCount",
-          cost: activeTournament.rebuyCost,
-          chipstack: activeTournament.rebuyChipstack,
-          enabled: activeTournament.rebuysAllowed,
-        },
-        {
           label: "Addons",
           countField: "addonCount",
           cost: activeTournament.addonCost,
           chipstack: activeTournament.addonChipstack,
           enabled: activeTournament.addonsAllowed,
+        },
+        {
+          label: "Rebuys",
+          countField: "rebuyCount",
+          cost: activeTournament.rebuyCost,
+          chipstack: activeTournament.rebuyChipstack,
+          enabled: activeTournament.rebuysAllowed,
         },
       ]
         .filter((entry) => entry.enabled)
@@ -989,30 +1020,18 @@ function App() {
     payoutPlaces,
     payouts: payoutValues,
   });
-  const averageChipstackMessage = averageChipstack > 0
-    ? `Average ChipStack: ${averageChipstack.toLocaleString()}`
-    : "";
-  const timerMessages = [
-    activeTournament?.name,
-    startingPlayers > 0
-      ? ` ${startingPlayers.toLocaleString()} Starting Players`
-      : "",
-    totalPrizePool > 0
-      ? `Total Prize Pool: ${formatCurrency(totalPrizePool)}`
-      : "",
-    getPayoutTimerMessage({
-      totalEntries,
-      effectivePayoutPlaces,
-      allowPayoutOverride,
-      payoutPlaces,
-      payouts: payoutValues,
-    }),
-    remainingPlayers > 0
-      ? ` ${remainingPlayers.toLocaleString()} Players Remaining`
-      : "",
-    averageChipstackMessage,
-
-  ].filter(Boolean);
+  const { averageChipstackMessage, messages: timerMessages } = getTimerMessages({
+    name: activeTournament?.name,
+    startingPlayers,
+    totalEntries,
+    totalPrizePool,
+    effectivePayoutPlaces,
+    allowPayoutOverride,
+    payoutPlaces,
+    payouts: payoutValues,
+    remainingPlayers,
+    averageChipstack,
+  });
   const timer = useTimer({
     activeTab,
     activeTournament,
@@ -1047,16 +1066,10 @@ function App() {
     toggleTimerFullscreen,
     totalDurationMs,
   } = timer;
-  const currentBigBlind = currentLevel?.level.isBreak
-    ? 0
-    : Number(currentLevel?.level.bigBlind);
-  const displayedTimerMessage =
-    averageChipstackMessage &&
-    activeTimerMessageIndex === timerMessages.length - 1 &&
-    Number.isFinite(currentBigBlind) &&
-    currentBigBlind > 0
-      ? `${averageChipstackMessage} (${Math.round(averageChipstack / currentBigBlind).toLocaleString()}xBB)`
-      : activeTimerMessage;
+  const displayedTimerMessage = getDisplayedTimerMessage(
+    activeTimerMessage, activeTimerMessageIndex, timerMessages,
+    averageChipstackMessage, averageChipstack, currentLevel,
+  );
   const previousTimerFullscreenRef = useRef(false);
 
   useEffect(() => {
@@ -1371,16 +1384,22 @@ function App() {
             {storageError}
           </p>
         )}
+        {activeTab === "Timer" && timerSettingsError && (
+          <p className="timer-fullscreen-error" role="alert">
+            {timerSettingsError}
+          </p>
+        )}
         {activeTab === "About" ? (
           <AboutPanel />
         ) : activeTab === "Settings" ? (
           <SettingsPanel
-            changingSettingsDirectory={changingSettingsDirectory}
-            onChangeSettingsFile={changeSettingsFile}
+            databasePath={databasePath}
+            reloadTimerSettings={reloadTimerSettings}
+            settingsConflict={settingsConflict}
+            settingsReloading={settingsReloading}
             previewCountdownWarning={previewCountdownWarning}
             previewLevelAlarm={previewLevelAlarm}
             setTimerSettings={setTimerSettings}
-            settingsDirectory={settingsDirectory}
             timerSettings={timerSettings}
             timerSettingsError={timerSettingsError}
             timerSettingsLoaded={timerSettingsLoaded}
@@ -1395,6 +1414,11 @@ function App() {
             {tournamentExportError && (
               <p className="storage-error" role="alert">
                 {tournamentExportError}
+              </p>
+            )}
+            {viewerOpenError && (
+              <p className="storage-error" role="alert">
+                {viewerOpenError}
               </p>
             )}
             {tournamentExportNotice && (
@@ -1465,6 +1489,7 @@ function App() {
                 expandedTournamentId={expandedTournamentId}
                 loadingTournaments={loadingTournaments}
                 onExportTournament={exportTournament}
+                onOpenViewer={openTournamentViewer}
                 onSetActive={activateTournament}
                 saving={saving}
                 setExpandedTournamentId={setExpandedTournamentId}
@@ -1589,6 +1614,7 @@ function App() {
                                 aria-label={`${entry.label} count`}
                                 onChange={(event) => {
                                   const value = event.target.value;
+                                  beginTournamentFieldEdit(activeTournament, entry.countField);
                                   setEntryCountDrafts((drafts) => ({
                                     ...drafts,
                                     [activeTournament.id]: {
@@ -1598,12 +1624,19 @@ function App() {
                                   }));
                                 }}
                                 onBlur={(event) => {
-                                  updateTournamentField(
-                                    activeTournament.id,
-                                    entry.countField,
-                                    event.target.value,
-                                  );
-                                  flushTournamentFieldUpdates();
+                                  const expected = endTournamentFieldEdit(activeTournament.id, entry.countField);
+                                  if (expected) {
+                                    updateTournamentField(
+                                      activeTournament.id,
+                                      entry.countField,
+                                      event.target.value,
+                                      undefined,
+                                      undefined,
+                                      undefined,
+                                      expected,
+                                    );
+                                    flushTournamentFieldUpdates();
+                                  }
                                   setEntryCountDrafts((drafts) => {
                                     const nextDrafts = {
                                       ...drafts[activeTournament.id],
@@ -1638,6 +1671,7 @@ function App() {
                               aria-label="Other chips-in-play contribution"
                               onChange={(event) => {
                                 const value = event.target.value;
+                                beginTournamentFieldEdit(activeTournament, "otherChipstack");
                                 setEntryCountDrafts((drafts) => ({
                                   ...drafts,
                                   [activeTournament.id]: {
@@ -1653,6 +1687,7 @@ function App() {
                               }}
                               onBlur={() => {
                                 flushTournamentFieldUpdates();
+                                endTournamentFieldEdit(activeTournament.id, "otherChipstack");
                                 setEntryCountDrafts((drafts) => {
                                   const nextDrafts = {
                                     ...drafts[activeTournament.id],
@@ -1678,6 +1713,7 @@ function App() {
                               }
                               aria-label="Other prize-pool contribution"
                               onChange={(value) => {
+                                beginTournamentFieldEdit(activeTournament, "otherPrizePool");
                                 setEntryCountDrafts((drafts) => ({
                                   ...drafts,
                                   [activeTournament.id]: {
@@ -1693,6 +1729,7 @@ function App() {
                               }}
                               onBlur={() => {
                                 flushTournamentFieldUpdates();
+                                endTournamentFieldEdit(activeTournament.id, "otherPrizePool");
                                 setEntryCountDrafts((drafts) => {
                                   const nextDrafts = {
                                     ...drafts[activeTournament.id],
@@ -1752,14 +1789,18 @@ function App() {
                             onPaste={(event) => event.preventDefault()}
                             onCut={(event) => event.preventDefault()}
                             onDrop={(event) => event.preventDefault()}
-                            onChange={(event) =>
+                            onChange={(event) => {
+                              beginTournamentFieldEdit(activeTournament, "bustoutCount");
                               updateTournamentField(
                                 activeTournament.id,
                                 "bustoutCount",
                                 event.target.value,
-                              )
-                            }
-                            onBlur={flushTournamentFieldUpdates}
+                              );
+                            }}
+                            onBlur={() => {
+                              flushTournamentFieldUpdates();
+                              endTournamentFieldEdit(activeTournament.id, "bustoutCount");
+                            }}
                           />
                         </label>
                         <button
@@ -1836,6 +1877,7 @@ function App() {
                             }
                             aria-label="Maximum players per table"
                             onChange={(event) => {
+                              beginTournamentFieldEdit(activeTournament, "maxPlayersPerTable");
                               setTableMaxDrafts((drafts) => ({
                                 ...drafts,
                                 [activeTournament.id]: event.target.value,
@@ -1848,6 +1890,7 @@ function App() {
                             }}
                             onBlur={() => {
                               flushTournamentFieldUpdates();
+                              endTournamentFieldEdit(activeTournament.id, "maxPlayersPerTable");
                               setTableMaxDrafts((drafts) => {
                                 const nextDrafts = { ...drafts };
                                 delete nextDrafts[activeTournament.id];
@@ -1939,6 +1982,7 @@ function App() {
                             aria-label="Number of players paid"
                             data-tour="timer-paid-places"
                             onChange={(event) => {
+                              beginTournamentFieldEdit(activeTournament, "payoutPlaces");
                               setPayoutPlaceDrafts((drafts) => ({
                                 ...drafts,
                                 [activeTournament.id]: event.target.value,
@@ -1951,6 +1995,7 @@ function App() {
                             }}
                             onBlur={() => {
                               flushTournamentFieldUpdates();
+                              endTournamentFieldEdit(activeTournament.id, "payoutPlaces");
                               setPayoutPlaceDrafts((drafts) => {
                                 const nextDrafts = { ...drafts };
                                 delete nextDrafts[activeTournament.id];
@@ -2041,6 +2086,7 @@ function App() {
                                     : `Calculated: ${formatCurrency(defaultPayouts[index])}`
                                 }
                                 onChange={(value) => {
+                                  beginTournamentFieldEdit(activeTournament, "payout");
                                   const nextDrafts = [
                                     ...(payoutDrafts[activeTournament.id] ?? []),
                                   ];
@@ -2060,6 +2106,7 @@ function App() {
                                 }}
                                 onBlur={() => {
                                   flushTournamentFieldUpdates();
+                                  endTournamentFieldEdit(activeTournament.id, "payout");
                                   setPayoutDrafts((drafts) => {
                                     const nextPayoutDrafts = [
                                       ...(drafts[activeTournament.id] ?? []),

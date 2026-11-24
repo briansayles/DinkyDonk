@@ -41,6 +41,12 @@ function TournamentActionIcon({ name }) {
           <path d="M12 7v5l3 2" />
         </>
       )}
+      {name === "browser" && (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18M12 3c-3 3-3 15 0 18M12 3c3 3 3 15 0 18" />
+        </>
+      )}
       {name === "delete" && (
         <path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 3v7m4-7v7" />
       )}
@@ -57,6 +63,7 @@ export default function TournamentList({
   expandedTournamentId,
   loadingTournaments,
   onExportTournament,
+  onOpenViewer,
   onSetActive,
   saving,
   setExpandedTournamentId,
@@ -78,9 +85,11 @@ export default function TournamentList({
                     );
                     const isExpanded =
                       expandedTournamentId === tournament.id;
+                    const isActive = activeTournamentId === tournament.id;
 
                     return (
-                    <li className="tournament-card" key={tournament.id}>
+                    <li className={`tournament-card${isActive ? " tournament-card-active" : ""}`}
+                      aria-current={isActive ? "true" : undefined} key={tournament.id}>
                       <div className="tournament-card-heading">
                         <h3>{tournament.name}</h3>
                         <div className="tournament-card-actions">
@@ -120,10 +129,20 @@ export default function TournamentList({
                             disabled={saving}
                             aria-label={`Go to timer for ${tournament.name}`}
                             title="Go to Timer"
-                            aria-pressed={activeTournamentId === tournament.id}
+                            aria-pressed={isActive}
                             onClick={() => onSetActive(tournament.id)}
                           >
                             <TournamentActionIcon name="timer" />
+                          </button>
+                          <button
+                            className="tournament-card-action"
+                            type="button"
+                            disabled={saving}
+                            aria-label={`View ${tournament.name} in browser`}
+                            title="View in browser"
+                            onClick={() => onOpenViewer(tournament.id)}
+                          >
+                            <TournamentActionIcon name="browser" />
                           </button>
                           <button
                             className="tournament-card-action tournament-card-delete"

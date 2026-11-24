@@ -6,13 +6,17 @@
   filter: drop-shadow(0 0 2em #61dafb);
 }
 :root {
+  --app-green-background:
+    radial-gradient(circle at 50% 40%, rgba(35, 101, 66, 0.9), transparent 55%),
+    #0b2117;
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
 
-  color: #0f0f0f;
-  background-color: #f6f6f6;
+  color: #f7f1df;
+  background: var(--app-green-background);
+  background-attachment: fixed;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -101,9 +105,7 @@
   display: grid;
   place-items: center;
   padding: 2rem;
-  background:
-    radial-gradient(circle at 50% 40%, rgba(35, 101, 66, 0.9), transparent 55%),
-    #0b2117;
+  background: var(--app-green-background);
   color: #f7f1df;
   opacity: 1;
   transition: opacity 450ms ease;
@@ -202,16 +204,17 @@
   border-radius: 6px 6px 0 0;
   padding: 0.75rem 1.25rem;
   background: transparent;
+  color: #f7f1df;
   box-shadow: none;
 }
 
 .tab-button:hover {
-  border-color: #9aa8d8;
+  border-color: #d7a928;
 }
 
 .tab-button.active {
-  border-bottom-color: #396cd8;
-  color: #2856b8;
+  border-bottom-color: #d7a928;
+  color: #f7f1df;
 }
 
 .tab-button:focus-visible {
@@ -376,8 +379,8 @@
 }
 
 .timer-tab-panel:not(.timer-tab-panel-active) {
-  border-color: #333;
-  background-color: #3b3b3b;
+  border-color: #236542;
+  background: var(--app-green-background);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
@@ -437,6 +440,7 @@
 }
 
 .timer-display {
+  --timer-control-height: 3.75rem;
   display: grid;
   flex: 1;
   min-height: 0;
@@ -1455,7 +1459,7 @@
   align-items: center;
   justify-content: center;
   width: 3.75rem;
-  height: 3.75rem;
+  height: var(--timer-control-height);
   padding: 0;
 }
 
@@ -1543,6 +1547,7 @@
   border: 1px solid #c33;
   border-radius: 6px;
   margin: 0 0 1rem;
+  background: #fff;
   color: #a32121;
 }
 
@@ -1555,6 +1560,7 @@
   border: 1px solid #39875b;
   border-radius: 6px;
   margin: 0 0 1rem;
+  background: #e8f5e9;
   color: #23643f;
 }
 
@@ -1576,6 +1582,12 @@
 
 .tournament-card {
   background-color: #efefef;
+  color: #0f0f0f;
+}
+
+.tournament-card-active {
+  border-color: #17813c;
+  box-shadow: inset 0 0 0 3px #17813c;
 }
 
 .tournament-form h3,
@@ -1604,7 +1616,7 @@
 .tournament-chip-editor-table input:disabled,
 .tournament-level-editor-table input:disabled {
   border-color: rgba(127, 127, 127, 0.45);
-  color: #777;
+  color: #b8c2bc;
   background-color: transparent;
   cursor: not-allowed;
   opacity: 1;
@@ -1747,7 +1759,7 @@
 
 .chip-stack-match {
   margin-right: 0.35rem;
-  color: #248a3d;
+  color: #79e590;
   font-size: 1.15em;
   line-height: 1;
 }
@@ -1901,8 +1913,7 @@
   border-bottom: 1px solid #d5d5d5;
 }
 
-.settings-directory-path,
-.settings-directory-help {
+.settings-directory-path {
   margin: 0.3rem 0 0;
   color: #555;
   overflow-wrap: anywhere;
@@ -1918,11 +1929,6 @@
   font-weight: 600;
 }
 
-.settings-directory-help {
-  font-size: 0.9rem;
-}
-
-.settings-file-dialog,
 .guided-tournament-dialog,
 .delete-tournament-dialog,
 .level-duration-dialog {
@@ -1934,14 +1940,12 @@
   background: #f6f6f6;
 }
 
-.settings-file-dialog::backdrop,
 .guided-tournament-dialog::backdrop,
 .delete-tournament-dialog::backdrop,
 .level-duration-dialog::backdrop {
   background: rgba(0, 0, 0, 0.5);
 }
 
-.settings-file-dialog form,
 .guided-tournament-dialog form,
 .guided-tournament-review,
 .delete-tournament-dialog-content,
@@ -1966,7 +1970,6 @@
   margin: 0;
 }
 
-.settings-file-dialog-actions,
 .guided-tournament-dialog-actions,
 .delete-tournament-dialog-actions,
 .level-duration-dialog-actions {
@@ -2069,7 +2072,7 @@
 .settings-save-status {
   justify-self: end;
   margin: 0;
-  color: #555;
+  color: #d7d0bc;
   font-size: 0.9rem;
   text-align: right;
 }
@@ -2442,6 +2445,16 @@ a:hover {
   color: #535bf2;
 }
 
+.tab-panel:not(.timer-tab-panel) a,
+.release-notice a {
+  color: #a8cfff;
+}
+
+.tab-panel:not(.timer-tab-panel) a:hover,
+.release-notice a:hover {
+  color: #d4e6ff;
+}
+
 h1 {
   text-align: center;
   font-size: 1rem;
@@ -2499,7 +2512,6 @@ textarea {
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
-    background-color: #2f2f2f;
   }
 
   a:hover {
@@ -2516,6 +2528,7 @@ textarea {
 
   .tournament-card {
     background-color: #383838;
+    color: #f6f6f6;
   }
 
   .tournament-card-delete {

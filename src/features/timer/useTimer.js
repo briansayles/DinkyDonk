@@ -17,8 +17,10 @@ export function useTimer({
   timerSettings,
   setTimerSettingsError,
   updateTournamentTimer,
+  readOnly = false,
+  clockOffsetMs = 0,
 }) {
-  const [clockNowMs, setClockNowMs] = useState(Date.now);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now() + clockOffsetMs);
   const [timerMessageIndex, setTimerMessageIndex] = useState(0);
   const [timerChips, setTimerChips] = useState([]);
   const [timerFullscreenError, setTimerFullscreenError] = useState("");
@@ -153,10 +155,11 @@ export function useTimer({
   }, [activeTournament, currentLevel?.index]);
 
   useEffect(() => {
-    setClockNowMs(Date.now());
-  }, [activeTournament?.id]);
+    setClockNowMs(Date.now() + clockOffsetMs);
+  }, [activeTournament?.id, clockOffsetMs]);
 
   useEffect(() => {
+    if (readOnly) return;
     const previousLevel = previousLevelRef.current;
     const nextLevelIndex = currentLevel?.index ?? null;
 
@@ -174,9 +177,10 @@ export function useTimer({
       tournamentKey: activeTournamentKey,
       levelIndex: nextLevelIndex,
     };
-  }, [activeTournamentKey, currentLevel?.index, startedAt, timerSettings]);
+  }, [activeTournamentKey, currentLevel?.index, startedAt, timerSettings, readOnly]);
 
   useEffect(() => {
+    if (readOnly) return;
     const levelKey =
       activeTournament?.id && currentLevel
         ? `${activeTournament.id}:${currentLevel.index}`
@@ -209,6 +213,7 @@ export function useTimer({
     currentLevel?.remainingMs,
     startedAt,
     timerSettings.countdownWarningSeconds,
+    readOnly,
   ]);
 
   useEffect(() => {
@@ -217,12 +222,13 @@ export function useTimer({
     }
 
     const intervalId = window.setInterval(() => {
-      setClockNowMs(Date.now());
-    }, 250);
+      setClockNowMs(Date.now() + clockOffsetMs);
+    }, 100);
     return () => window.clearInterval(intervalId);
-  }, [startedAt]);
+  }, [startedAt, clockOffsetMs]);
 
   useEffect(() => {
+    if (readOnly) return undefined;
     function updateKeepAwake() {
       const enabled =
         activeTab === "Timer" &&
@@ -247,7 +253,7 @@ export function useTimer({
       document.removeEventListener("visibilitychange", updateKeepAwake);
       window.removeEventListener("pagehide", releaseKeepAwake);
     };
-  }, [activeTab, startedAt]);
+  }, [activeTab, startedAt, readOnly]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -557,7 +563,7 @@ export function useTimer({
       return;
     }
 
-    const now = Date.now();
+    const now = Date.now() + clockOffsetMs;
     if (timerIsRunning) {
       const elapsedSinceStart =
         activeTournament.timerStartedAt === null ||
@@ -568,14 +574,14 @@ export function useTimer({
         timerElapsedMs: Math.max(0, elapsedMs + elapsedSinceStart),
         timerStartedAt: null,
         timerIsRunning: false,
-      });
+      }, activeTournament);
     } else {
       prepareTimerAudio();
       updateTournamentTimer(activeTournament.id, {
         timerElapsedMs: elapsedMs,
         timerStartedAt: now,
         timerIsRunning: true,
-      });
+      }, activeTournament);
     }
     setClockNowMs(now);
   }
@@ -586,9 +592,9 @@ export function useTimer({
         timerElapsedMs: 0,
         timerStartedAt: null,
         timerIsRunning: false,
-      });
+      }, activeTournament);
     }
-    setClockNowMs(Date.now());
+    setClockNowMs(Date.now() + clockOffsetMs);
   }
 
   function setTimerPosition(positionMs, now) {
@@ -597,7 +603,7 @@ export function useTimer({
         timerElapsedMs: positionMs,
         timerStartedAt: timerIsRunning ? now : null,
         timerIsRunning,
-      });
+      }, activeTournament);
     }
     setClockNowMs(now);
   }
@@ -607,7 +613,7 @@ export function useTimer({
       return;
     }
 
-    const now = Date.now();
+    const now = Date.now() + clockOffsetMs;
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs
@@ -626,7 +632,7 @@ export function useTimer({
       return;
     }
 
-    const now = Date.now();
+    const now = Date.now() + clockOffsetMs;
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs
@@ -648,7 +654,7 @@ export function useTimer({
       return;
     }
 
-    const now = Date.now();
+    const now = Date.now() + clockOffsetMs;
     const elapsedAtAction =
       startedAt === null
         ? elapsedMs

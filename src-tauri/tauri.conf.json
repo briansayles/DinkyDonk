@@ -4,7 +4,7 @@
   "version": "0.8.0",
   "identifier": "com.brian.dinkydonk",
   "build": {
-    "beforeDevCommand": "yarn dev",
+    "beforeDevCommand": "yarn build && yarn dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
@@ -32,5 +32,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "features": {
+      "protocol": ["all"],
+      "deep-link": {
+        "schema": "dinkydonk",
+        "mobile": [
+          { "host": "app.infini.cloud", "pathPrefix": ["/open"] }
+        ],
+        "desktop": {
+          "schemes": ["dinkydonk"]
+        }
+      }
+    }
   }
 }

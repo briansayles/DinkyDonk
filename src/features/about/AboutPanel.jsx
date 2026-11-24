@@ -40,8 +40,8 @@ const features = [
     "Record entries and bustouts, calculate prize pools and chips in play, configure payouts, and estimate table assignments.",
   ],
   [
-    "Shared-folder updates",
-    "Store tournament data and timer preferences in a selected JSON settings file. Open app instances check for changes about once per second, so multiple devices sharing that file can show the same tournament.",
+    "Local storage",
+    "Store tournament data and timer preferences in a local SQLite database. View the active timer on other devices using the read-only network viewer.",
   ],
   [
     "Alarms and announcements",

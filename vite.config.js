@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import process from "node:process";
+import { resolve } from "node:path";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
@@ -11,6 +12,15 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(process.cwd(), "index.html"),
+        viewer: resolve(process.cwd(), "network-viewer.html"),
+        td: resolve(process.cwd(), "td.html"),
+      },
+    },
+  },
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,

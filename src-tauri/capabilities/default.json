@@ -6,6 +6,9 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "deep-link:allow-get-current",
+    "deep-link:default",
+    "deep-link:allow-register"    
   ]
 }

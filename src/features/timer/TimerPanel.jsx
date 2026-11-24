@@ -68,7 +68,7 @@ function TimerChip({ chip, onAnimationEnd, onDoubleClick }) {
       role="img"
       aria-hidden={chip.isExiting}
       aria-label={`${formatChipDenomination(chip.denomination)} chip`}
-      title="Double-click to edit chip settings"
+      title={onDoubleClick ? "Double-click to edit chip settings" : undefined}
       onDoubleClick={onDoubleClick}
     >
       {formatChipDenomination(chip.denomination)}
@@ -211,8 +211,8 @@ function NextBlinds({ direction, value, onEditSection }) {
     <div
       ref={groupRef}
       className="timer-next-blinds-group"
-      title="Double-click to edit the blinds schedule"
-      onDoubleClick={() => onEditSection("edit-entry-levels")}
+      title={onEditSection ? "Double-click to edit the blinds schedule" : undefined}
+      onDoubleClick={onEditSection ? () => onEditSection("edit-entry-levels") : undefined}
     >
       <p ref={valueRef} className="timer-next-blinds">
         <AnimatedBlindValue
@@ -400,6 +400,7 @@ export default function TimerPanel({
   timerMessageCount,
   timerSettings,
   totalDurationMs,
+  readOnly = false,
 }) {
   const currentLevelIndex = currentLevel?.index ?? null;
   const previousLevelIndexRef = useRef(currentLevelIndex);
@@ -476,7 +477,59 @@ export default function TimerPanel({
           nextLevel.level.ante,
         );
   const isPaused = currentLevel && startedAt === null;
+  const hasCurrentLevel = Boolean(currentLevel);
   const [currentBlindsGroupRef, currentBlindsValueRef] = useFitBlinds(currentBlindsText);
+  const messageRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const container = messageRef.current;
+    const text = container?.firstElementChild;
+    if (!readOnly || !container || !text) return;
+
+    function fitMessage() {
+      text.style.removeProperty("font-size");
+
+      const style = window.getComputedStyle(container);
+      let minimum = 0;
+      let maximum = parseFloat(style.fontSize);
+      for (let i = 0; i < 12; i += 1) {
+        const size = (minimum + maximum) / 2;
+        text.style.fontSize = `${size}px`;
+        const bounds = text.getBoundingClientRect();
+        const containerBounds = container.getBoundingClientRect();
+        const width = containerBounds.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const height = containerBounds.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+        if (width <= 0 || height <= 0) {
+          text.style.removeProperty("font-size");
+          return;
+        }
+        if (bounds.width <= width + 0.1 && bounds.height <= height + 0.1) {
+          minimum = size;
+        } else {
+          maximum = size;
+        }
+      }
+      text.style.fontSize = `${minimum}px`;
+    }
+
+    const observer = new ResizeObserver(fitMessage);
+    observer.observe(container);
+    fitMessage();
+    return () => {
+      observer.disconnect();
+    };
+  }, [readOnly, hasCurrentLevel, activeTimerMessage, activeTimerMessageIndex]);
+
+  const timerMessage = (
+    <div ref={messageRef} className="timer-message" aria-live="polite">
+      <span
+        key={activeTimerMessageIndex}
+        className={`timer-message-text${timerMessageCount === 1 ? " timer-message-text-static" : ""}`}
+      >
+        {activeTimerMessage}
+      </span>
+    </div>
+  );
 
   return (
     <div className={`timer-display${isPaused ? " timer-display-paused" : ""}`}>
@@ -488,8 +541,8 @@ export default function TimerPanel({
           ref={currentBlindsGroupRef}
           className="timer-blinds-group"
           data-tour="timer-blinds"
-          title="Double-click to edit the blinds schedule"
-          onDoubleClick={() => onEditSection("edit-entry-levels")}
+          title={!readOnly ? "Double-click to edit the blinds schedule" : undefined}
+          onDoubleClick={!readOnly ? () => onEditSection("edit-entry-levels") : undefined}
         >
           <div className="timer-current-blinds-content">
             <p ref={currentBlindsValueRef} className="timer-blinds" aria-hidden={!currentLevel}>
@@ -544,7 +597,7 @@ export default function TimerPanel({
           <NextBlinds
             direction={blindsDirection}
             value={nextBlindsText}
-            onEditSection={onEditSection}
+            onEditSection={readOnly ? undefined : onEditSection}
           />
         ) : <div />}
         <a
@@ -581,7 +634,7 @@ export default function TimerPanel({
             <TimerChip
               chip={chip}
               onAnimationEnd={onFinishChipAnimation}
-              onDoubleClick={() => onEditSection("edit-entry-chips")}
+              onDoubleClick={!readOnly ? () => onEditSection("edit-entry-chips") : undefined}
             />
           </div>
         ))}
@@ -589,8 +642,8 @@ export default function TimerPanel({
       <div
         className="timer-clock-area"
         data-tour="timer-clock-area"
-        title="Double-click to edit the blinds schedule"
-        onDoubleClick={() => onEditSection("edit-entry-levels")}
+        title={!readOnly ? "Double-click to edit the blinds schedule" : undefined}
+        onDoubleClick={!readOnly ? () => onEditSection("edit-entry-levels") : undefined}
       >
         {currentLevel ? (
           <div className={`timer-countdown timer-progress-${progressColor}`}>
@@ -639,14 +692,7 @@ export default function TimerPanel({
               </svg>
               <TimerClock remainingMs={currentLevel.remainingMs} />
             </div>
-            <div className="timer-message" aria-live="polite">
-              <span
-                key={activeTimerMessageIndex}
-                className={`timer-message-text${timerMessageCount === 1 ? " timer-message-text-static" : ""}`}
-              >
-                {activeTimerMessage}
-              </span>
-            </div>
+            {timerMessage}
           </div>
         ) : (
           <p className="timer-complete">
@@ -657,7 +703,7 @@ export default function TimerPanel({
         )}
       </div>
       {children}
-      <div 
+      {!readOnly && <div
         className="timer-bottom-center"
         data-tour="timer-transport-controls"
       >
@@ -735,7 +781,7 @@ export default function TimerPanel({
             />
           </label>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,0 +1,29 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101923; color: #eef4f7; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.td-page { max-width: 1150px; margin: auto; padding: 1rem; }
+.td-page header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+h1 { font-size: 1.5rem; } h2 { font-size: 1.35rem; }
+h3 { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 0; }
+.td-heading-actions { display: flex; gap: .4rem; }
+a { color: #8bd1ff; }
+button, input { font: inherit; }
+button { background: #244b63; color: white; border: 1px solid #6c94a7; border-radius: .35rem; padding: .5rem .75rem; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+input[type=number] { width: 7rem; max-width: 100%; padding: .4rem; border: 1px solid #78909c; border-radius: .3rem; background: #101923; color: white; }
+.td-spinner { display: inline-flex; align-items: center; gap: .2rem; }
+.td-spinner input[type=number] { width: 4.5rem; min-width: 0; text-align: center; appearance: textfield; -moz-appearance: textfield; }
+.td-spinner input::-webkit-inner-spin-button, .td-spinner input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.td-spinner button { min-width: 2.25rem; padding: .4rem; }
+.td-card { background: #1c2b37; border: 1px solid #405461; border-radius: .5rem; padding: 1rem; margin-bottom: 1rem; }
+.td-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 1rem; }
+.td-grid .td-card { margin: 0; }
+.td-clock { font-size: 2rem; font-weight: bold; margin: .25rem 0; font-variant-numeric: tabular-nums; }
+.td-transport { display: flex; flex-wrap: wrap; gap: .5rem; }
+.td-volume { margin-top: 1rem; }
+.td-volume label { display: flex; align-items: center; gap: .75rem; }
+.td-scroll { overflow-x: auto; }
+.td-payouts { max-height: 18rem; overflow-y: auto; }
+table { width: 100%; border-collapse: collapse; margin-top: .75rem; text-align: left; }
+th, td { padding: .45rem; border-bottom: 1px solid #405461; }
+.td-error, [role=alert] { color: #ffb4a9; }

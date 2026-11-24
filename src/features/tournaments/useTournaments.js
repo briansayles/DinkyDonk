@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DEFAULT_MAX_PLAYERS_PER_TABLE, normalizeMaxPlayersPerTable, sortChips, sortLevels, updateBustoutPayouts } from "../../domain/tournament";
 import {
@@ -9,6 +9,7 @@ import {
   resizeBustouts,
   resizeParticipants,
 } from "../../domain/participants";
+import { getTournamentChanges } from "./tournamentChanges";
 
 function normalizeTournaments(tournaments) {
   return tournaments.map((tournament) => ({
@@ -18,8 +19,7 @@ function normalizeTournaments(tournaments) {
   }));
 }
 
-function getBustoutUpdates(tournament, count) {
-  const timestamp = Date.now();
+function getBustoutUpdates(tournament, count, timestamp = Date.now()) {
   const completedBustoutCount =
     getTournamentEndBustoutCount(tournament, count) ?? count;
   return {
@@ -28,7 +28,7 @@ function getBustoutUpdates(tournament, count) {
   };
 }
 
-export function useTournaments() {
+export function useTournaments({ invokeCommand = invoke, now = Date.now, reconcilePayouts = true } = {}) {
   const [tournaments, setTournaments] = useState([]);
   const [activeTournamentId, setActiveTournamentId] = useState(null);
   const [expandedTournamentId, setExpandedTournamentId] = useState(null);
@@ -41,41 +41,30 @@ export function useTournaments() {
   const [tableMaxDrafts, setTableMaxDrafts] = useState({});
   const savingRef = useRef(false);
   const loadingRef = useRef(false);
+  const loadedSuccessfullyRef = useRef(false);
   const pendingFieldUpdatesRef = useRef(false);
+  const pendingFieldBaseRef = useRef(null);
   const fieldUpdateTimeoutRef = useRef(null);
   const saveQueueRef = useRef(Promise.resolve());
+  const queuedWritesRef = useRef(0);
+  const failureSequenceRef = useRef(0);
+  const expectedTournamentRef = useRef(new WeakMap());
+  const fieldDraftsRef = useRef(new Map());
   const latestTournamentsRef = useRef(tournaments);
   const latestActiveTournamentIdRef = useRef(activeTournamentId);
 
-  async function loadTournaments() {
-    const savedTournaments = await invoke("load_tournaments");
-    if (savingRef.current || pendingFieldUpdatesRef.current) {
-      return;
-    }
-
-    const updatedTournaments = savedTournaments.tournaments.map(updateBustoutPayouts);
-    if (updatedTournaments.some((tournament, index) => tournament !== savedTournaments.tournaments[index])) {
-      const saved = await invoke("reconcile_bustout_payouts", {
-        expectedTournaments: savedTournaments.tournaments,
-        bustoutPayouts: updatedTournaments.map((tournament) =>
-          (tournament.bustouts ?? []).map((bustout) => bustout.payout),
-        ),
-      });
-      if (!saved || savingRef.current || pendingFieldUpdatesRef.current) {
-        return;
-      }
-    }
-
-    const normalizedTournaments = normalizeTournaments(
-      updatedTournaments,
-    );
+  function applyTournamentData(savedTournaments) {
+    const normalized = normalizeTournaments(savedTournaments.tournaments);
+    const normalizedTournaments = JSON.stringify(latestTournamentsRef.current) === JSON.stringify(normalized)
+      ? latestTournamentsRef.current
+      : normalized;
+    normalizedTournaments.forEach((tournament, index) => {
+      expectedTournamentRef.current.set(tournament, savedTournaments.tournaments[index]);
+    });
+    loadedSuccessfullyRef.current = true;
     latestTournamentsRef.current = normalizedTournaments;
     latestActiveTournamentIdRef.current = savedTournaments.activeTournamentId;
-    setTournaments((current) =>
-      JSON.stringify(current) === JSON.stringify(normalizedTournaments)
-        ? current
-        : normalizedTournaments,
-    );
+    setTournaments(normalizedTournaments);
     setActiveTournamentId((current) =>
       current === savedTournaments.activeTournamentId
         ? current
@@ -83,11 +72,35 @@ export function useTournaments() {
     );
   }
 
+  async function loadTournaments() {
+    const savedTournaments = await invokeCommand("load_tournaments");
+    if (savingRef.current || pendingFieldUpdatesRef.current || fieldDraftsRef.current.size) {
+      return;
+    }
+
+    const updatedTournaments = reconcilePayouts
+      ? savedTournaments.tournaments.map(updateBustoutPayouts)
+      : savedTournaments.tournaments;
+    if (reconcilePayouts && updatedTournaments.some((tournament, index) => tournament !== savedTournaments.tournaments[index])) {
+      const saved = await invokeCommand("reconcile_bustout_payouts", {
+        expectedTournaments: savedTournaments.tournaments,
+        bustoutPayouts: updatedTournaments.map((tournament) =>
+          (tournament.bustouts ?? []).map((bustout) => bustout.payout),
+        ),
+      });
+      if (!saved || savingRef.current || pendingFieldUpdatesRef.current || fieldDraftsRef.current.size) {
+        return;
+      }
+    }
+
+    applyTournamentData({ ...savedTournaments, tournaments: updatedTournaments });
+  }
+
   useEffect(() => {
     let active = true;
 
     async function synchronizeTournaments() {
-      if (!active || savingRef.current || loadingRef.current) {
+      if (!active || savingRef.current || loadingRef.current || fieldDraftsRef.current.size) {
         return;
       }
 
@@ -101,7 +114,7 @@ export function useTournaments() {
         console.error("Could not load tournament structures.", error);
         if (active) {
           setStorageError(
-            "Tournament structures could not be synchronized from the settings file.",
+            "Tournament structures could not be synchronized from the database.",
           );
           setLoadingTournaments(false);
         }
@@ -134,60 +147,81 @@ export function useTournaments() {
   async function persistTournamentData(
     nextTournaments,
     nextActiveTournamentId = activeTournamentId,
+    baseTournaments = tournaments,
+    baseActiveTournamentId = activeTournamentId,
+    verifyActive = false,
   ) {
+    if (!loadedSuccessfullyRef.current) {
+      setStorageError("Tournament changes cannot be saved until the database has been loaded.");
+      return false;
+    }
     nextTournaments = nextTournaments.map(updateBustoutPayouts);
+    let changes;
+    try {
+      changes = getTournamentChanges(
+        baseTournaments,
+        nextTournaments,
+        (tournament) => expectedTournamentRef.current.get(tournament) ?? tournament,
+      );
+    } catch (error) {
+      console.error("Could not prepare tournament changes.", error);
+      setStorageError(`Tournament changes could not be prepared: ${error}`);
+      return false;
+    }
+    const activeChange = !verifyActive && baseActiveTournamentId === nextActiveTournamentId
+      ? null
+      : { expected: baseActiveTournamentId, value: nextActiveTournamentId };
+    if (!changes.length && !activeChange) return true;
+
+    const failureSequence = failureSequenceRef.current;
+    queuedWritesRef.current += 1;
     savingRef.current = true;
     setSaving(true);
-    try {
-      await invoke("save_tournaments", {
-        tournaments: nextTournaments,
-        activeTournamentId: nextActiveTournamentId,
-      });
-      latestTournamentsRef.current = nextTournaments;
-      latestActiveTournamentIdRef.current = nextActiveTournamentId;
-      setTournaments(nextTournaments);
-      setActiveTournamentId(nextActiveTournamentId);
-      setStorageError("");
-      return true;
-    } catch (error) {
-      console.error("Could not save tournament structures.", error);
-      setStorageError("Tournament changes could not be saved to this device.");
-      return false;
-    } finally {
-      savingRef.current = false;
-      setSaving(false);
-    }
+    const operation = saveQueueRef.current.then(async () => {
+      try {
+        const saved = await invokeCommand("apply_tournament_changes", { changes, activeChange });
+        if (!pendingFieldUpdatesRef.current && queuedWritesRef.current === 1) {
+          applyTournamentData(saved);
+        }
+        if (failureSequenceRef.current === failureSequence) setStorageError("");
+        return true;
+      } catch (error) {
+        failureSequenceRef.current += 1;
+        console.error("Could not save tournament changes.", error);
+        setStorageError(String(error).includes("Conflict:")
+          ? "Tournament changes were not saved because the data changed elsewhere. Review the latest data and try again."
+          : `Tournament changes could not be saved: ${error}`);
+        return false;
+      } finally {
+        queuedWritesRef.current -= 1;
+        if (queuedWritesRef.current === 0) {
+          savingRef.current = false;
+          setSaving(false);
+        }
+      }
+    });
+    saveQueueRef.current = operation;
+    return operation;
   }
 
   function flushTournamentFieldUpdates() {
     window.clearTimeout(fieldUpdateTimeoutRef.current);
     fieldUpdateTimeoutRef.current = null;
     if (!pendingFieldUpdatesRef.current) {
-      return saveQueueRef.current;
+      return saveQueueRef.current.then(() => true);
+    }
+    if (!loadedSuccessfullyRef.current) {
+      setStorageError("Tournament changes cannot be saved until the database has been loaded.");
+      return Promise.resolve(false);
     }
 
     pendingFieldUpdatesRef.current = false;
+    const base = pendingFieldBaseRef.current;
+    pendingFieldBaseRef.current = null;
     const nextTournaments = latestTournamentsRef.current;
-    const nextActiveTournamentId = latestActiveTournamentIdRef.current;
-    savingRef.current = true;
-    saveQueueRef.current = saveQueueRef.current.then(async () => {
-      setSaving(true);
-      try {
-        await invoke("save_tournaments", {
-          tournaments: nextTournaments,
-          activeTournamentId: nextActiveTournamentId,
-        });
-        setStorageError("");
-      } catch (error) {
-        console.error("Could not save tournament field changes.", error);
-        setStorageError("Tournament changes could not be saved to this device.");
-      } finally {
-        savingRef.current = false;
-        setSaving(false);
-      }
-    });
-
-    return saveQueueRef.current;
+    return persistTournamentData(
+      nextTournaments, base.activeTournamentId, base.tournaments, base.activeTournamentId, true,
+    );
   }
 
   function updateTournamentField(
@@ -197,11 +231,16 @@ export function useTournaments() {
     payoutIndex,
     payoutPlacesForUpdate,
     calculatedPayouts,
+    expectedTournament,
   ) {
     const currentTournament = latestTournamentsRef.current.find(
       (tournament) => tournament.id === tournamentId,
     );
     if (!currentTournament) {
+      return;
+    }
+    if (expectedTournament && JSON.stringify(currentTournament) !== JSON.stringify(expectedTournament)) {
+      setStorageError("The tournament changed while this field was being edited. Review the latest data and try again.");
       return;
     }
 
@@ -255,11 +294,12 @@ export function useTournaments() {
       }
       updatedFields = {
         ...(field === "bustoutCount"
-          ? getBustoutUpdates(currentTournament, parsedValue)
+          ? getBustoutUpdates(currentTournament, parsedValue, now())
           : {
               [arrayField]: resizeParticipants(
                 currentTournament[arrayField] ?? [],
                 parsedValue,
+                now(),
               ),
             }),
       };
@@ -276,6 +316,12 @@ export function useTournaments() {
       return;
     }
 
+    if (!pendingFieldUpdatesRef.current) {
+      pendingFieldBaseRef.current = {
+        tournaments: latestTournamentsRef.current,
+        activeTournamentId: tournamentId,
+      };
+    }
     const nextTournaments = latestTournamentsRef.current.map((tournament) =>
       tournament.id === tournamentId
         ? updateBustoutPayouts({ ...tournament, ...updatedFields })
@@ -291,8 +337,29 @@ export function useTournaments() {
     );
   }
 
-  async function updateTournamentTimer(tournamentId, timerState) {
-    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
+  function beginTournamentFieldEdit(tournament, field) {
+    const key = `${tournament.id}\0${field}`;
+    if (!fieldDraftsRef.current.has(key)) fieldDraftsRef.current.set(key, tournament);
+  }
+
+  function endTournamentFieldEdit(tournamentId, field) {
+    const key = `${tournamentId}\0${field}`;
+    const expected = fieldDraftsRef.current.get(key);
+    fieldDraftsRef.current.delete(key);
+    return expected;
+  }
+
+  const clearTournamentFieldEdits = useCallback(() => {
+    fieldDraftsRef.current.clear();
+  }, []);
+
+  async function updateTournamentTimer(tournamentId, timerState, expectedTournament) {
+    if (pendingFieldUpdatesRef.current && !(await flushTournamentFieldUpdates())) return false;
+    const baseTournaments = latestTournamentsRef.current.map((tournament) =>
+      tournament.id === tournamentId ? expectedTournament : tournament,
+    );
+    const baseActiveId = tournamentId;
+    const nextTournaments = baseTournaments.map((tournament) =>
       tournament.id === tournamentId
         ? { ...tournament, ...timerState }
         : tournament,
@@ -303,20 +370,30 @@ export function useTournaments() {
 
     return persistTournamentData(
       nextTournaments,
-      latestActiveTournamentIdRef.current,
+      baseActiveId,
+      baseTournaments,
+      baseActiveId,
+      true,
     );
   }
 
-  async function saveTournament(tournament, editingId) {
+  async function saveTournament(tournament, editingId, editingBase) {
+    const baseTournaments = editingId && editingBase
+      ? tournaments.map((item) => item.id === editingId ? editingBase : item)
+      : tournaments;
+    if (editingId && !baseTournaments.some((item) => item.id === editingId)) {
+      setStorageError("The tournament was deleted. Your changes were not saved.");
+      return false;
+    }
     const nextTournaments = editingId
       ? tournaments.map((item) => (item.id === editingId ? tournament : item))
       : [...tournaments, tournament];
 
-    return persistTournamentData(nextTournaments);
+    return persistTournamentData(nextTournaments, activeTournamentId, baseTournaments, activeTournamentId);
   }
 
   async function copyTournament(tournamentId) {
-    await flushTournamentFieldUpdates();
+    if (!(await flushTournamentFieldUpdates())) return false;
     const source = latestTournamentsRef.current.find(
       (tournament) => tournament.id === tournamentId,
     );
@@ -358,6 +435,8 @@ export function useTournaments() {
       !(await persistTournamentData(
         nextTournaments,
         latestActiveTournamentIdRef.current,
+        latestTournamentsRef.current,
+        latestActiveTournamentIdRef.current,
       ))
     ) {
       return false;
@@ -367,12 +446,20 @@ export function useTournaments() {
     return true;
   }
 
-  async function deleteTournament(id) {
-    await flushTournamentFieldUpdates();
-    const nextTournaments = latestTournamentsRef.current.filter((item) => item.id !== id);
+  async function deleteTournament(id, expectedTournament) {
+    if (!(await flushTournamentFieldUpdates())) return false;
+    if (!latestTournamentsRef.current.some((item) => item.id === id)) {
+      setStorageError("The tournament was already deleted.");
+      return false;
+    }
+    const baseTournaments = latestTournamentsRef.current.map((item) =>
+      item.id === id ? expectedTournament : item,
+    );
+    const baseActiveId = latestActiveTournamentIdRef.current;
+    const nextTournaments = baseTournaments.filter((item) => item.id !== id);
     const nextActiveTournamentId =
-      latestActiveTournamentIdRef.current === id ? null : latestActiveTournamentIdRef.current;
-    return persistTournamentData(nextTournaments, nextActiveTournamentId);
+      baseActiveId === id ? null : baseActiveId;
+    return persistTournamentData(nextTournaments, nextActiveTournamentId, baseTournaments, baseActiveId);
   }
 
   async function updateEntryCount(tournamentId, field, value) {
@@ -398,11 +485,12 @@ export function useTournaments() {
         ? {
             ...tournament,
             ...(field === "bustoutCount"
-              ? getBustoutUpdates(tournament, parsedCount)
+              ? getBustoutUpdates(tournament, parsedCount, now())
               : {
                   [arrayField]: resizeParticipants(
                     tournament[arrayField] ?? [],
                     parsedCount,
+                    now(),
                   ),
                 }),
           }
@@ -514,7 +602,7 @@ export function useTournaments() {
       return;
     }
 
-    await flushTournamentFieldUpdates();
+    if (!(await flushTournamentFieldUpdates())) return;
     const resetFields = {
       buyins: [],
       rebuys: [],
@@ -523,13 +611,21 @@ export function useTournaments() {
       otherChipstack: 0,
       bustouts: [],
     };
-    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
+    const baseTournaments = latestTournamentsRef.current.map((tournament) =>
+      tournament.id === activeTournament.id ? activeTournament : tournament,
+    );
+    if (!baseTournaments.some((tournament) => tournament.id === activeTournament.id)) {
+      setStorageError("The tournament was deleted. Your changes were not saved.");
+      return;
+    }
+    const baseActiveId = activeTournament.id;
+    const nextTournaments = baseTournaments.map((tournament) =>
       tournament.id === activeTournament.id
         ? { ...tournament, ...resetFields }
         : tournament,
     );
 
-    if (await persistTournamentData(nextTournaments)) {
+    if (await persistTournamentData(nextTournaments, baseActiveId, baseTournaments, baseActiveId, true)) {
       setEntryCountDrafts((drafts) => ({
         ...drafts,
         [activeTournament.id]: {},
@@ -542,13 +638,21 @@ export function useTournaments() {
       return;
     }
 
-    await flushTournamentFieldUpdates();
-    const nextTournaments = latestTournamentsRef.current.map((tournament) =>
+    if (!(await flushTournamentFieldUpdates())) return;
+    const baseTournaments = latestTournamentsRef.current.map((tournament) =>
+      tournament.id === activeTournament.id ? activeTournament : tournament,
+    );
+    if (!baseTournaments.some((tournament) => tournament.id === activeTournament.id)) {
+      setStorageError("The tournament was deleted. Your changes were not saved.");
+      return;
+    }
+    const baseActiveId = activeTournament.id;
+    const nextTournaments = baseTournaments.map((tournament) =>
       tournament.id === activeTournament.id
         ? { ...tournament, bustouts: [] }
         : tournament,
     );
-    if (await persistTournamentData(nextTournaments, latestActiveTournamentIdRef.current)) {
+    if (await persistTournamentData(nextTournaments, baseActiveId, baseTournaments, baseActiveId, true)) {
       setEntryCountDrafts((drafts) => {
         const nextDrafts = { ...drafts[activeTournament.id] };
         delete nextDrafts.bustoutCount;
@@ -568,7 +672,7 @@ export function useTournaments() {
         : tournament,
     );
 
-    if (await persistTournamentData(nextTournaments)) {
+    if (await persistTournamentData(nextTournaments, activeTournament.id, tournaments, activeTournament.id, true)) {
       setPayoutPlaceDrafts((drafts) => {
         const nextDrafts = { ...drafts };
         delete nextDrafts[activeTournament.id];
@@ -593,7 +697,7 @@ export function useTournaments() {
         : tournament,
     );
 
-    if (await persistTournamentData(nextTournaments)) {
+    if (await persistTournamentData(nextTournaments, tournamentId, tournaments, tournamentId, true)) {
       setTableMaxDrafts((drafts) => {
         const nextDrafts = { ...drafts };
         delete nextDrafts[tournamentId];
@@ -615,9 +719,12 @@ export function useTournaments() {
       (tournament) => tournament.id === activeTournamentId,
     ),
     activeTournamentId,
+    beginTournamentFieldEdit,
+    clearTournamentFieldEdits,
     copyTournament,
     deleteTournament,
     entryCountDrafts,
+    endTournamentFieldEdit,
     expandedTournamentId,
     loadingTournaments,
     loadTournaments: reloadTournaments,

@@ -1,5 +1,3 @@
-export const timerSettingsStorageKey = "dinky-donk-timer-settings";
-
 export const defaultTimerSettings = {
   alarmSound: "triple-ding",
   volume: 0.5,
