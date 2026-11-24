@@ -1,20 +1,17 @@
 ---
 layout: default
-img: phones.png
+img: Screenshot Timer 1.png
 category: Features
-title: Tournament Management via the Timer Screen
+title: Tournament Timer - Game Controls
 description: |
 ---
-**Timer Management**
-- Run timed blind levels and breaks (play/pause, restart level, jump back/forward a level, and reset controls on screen)
 
-**Buyin Management** Enter buyins, rebuys, addons, and other prize pool or chips in play additions, all via simple spinner controls
+Manage **buyins, payouts, bustouts and tables** all right from the timer screen
 
-**Payouts Management** The paytable is automatically created based on your entries in the structure editor:
-  - Percent of players to be paid, and
-  - Paytable shape (flat, balanced or top heavy)
-If the paytable is allowed to be over-ridden, it can be edited on the timer screen via spinners for number to be paid and for each place's payout
+- Enter buyins, rebuys, addons, and other prize pool or chips in play additions, all via simple spinner controls
 
-**Bustouts Management** Use the bustouts spinner to record bustouts
+- Edit the automatically-calculated paytable to better meet your needs (a green checkmark lets you know your total payout equals your total prize pool)
 
-**Tables Management** Enter the maximum number of players per table and the Tables table shows how many tables of x and x-1 players you should have
+- Use the bustouts spinner to record bustouts which instantly affect players remaining, chips in play, table allocations, etc... 
+
+- Enter the maximum number of players per table and the Tables section shows how many tables of x and x-1 players you should have
