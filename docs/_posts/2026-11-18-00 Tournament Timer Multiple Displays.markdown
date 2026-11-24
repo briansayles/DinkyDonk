@@ -8,10 +8,17 @@ description: |
 
 **Display the timer simultaneously on multiple screens**
 
-You can run one instance of the program and display it on multiple screens using Screen Mirroring or Casting
+The program serves a read-only Timer page on the local network. Any browser able to connect to the host computer can display the timer.
 
-You can run multiple instances of the program on one computer, displaying each window on a different monitor/screen
+- Other PCs
+- Tablets
+- Smart phones
+- Smart TVs
 
-You can run multiple instances on different computers as long as they can access a common 'database' file (really, just a .JSON file stored on a local or cloud-based network)
+The program also serves a Tournament Director page on the same network, allowing the director to run the tournament from a remote device like a smart phone
 
-The in-program volume controls are applicable on a per-computer basis, so it's best to figure out which one(s) you want to use for alarms/announcements ahead of time. While they'll be **very** close to in synch, they won't be 100%, so do some testing in advance.
+- Play, pause, jump levels, reset timer
+- Add/remove buyins, addons, rebuys
+- Add/remove bustouts
+- Edit number to be paid and payout amounts
+- Edit max players per table
