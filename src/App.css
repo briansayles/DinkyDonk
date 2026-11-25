@@ -1348,6 +1348,12 @@
     stroke 0.25s ease;
 }
 
+.timer-progress-seconds {
+  transition:
+    stroke-dashoffset 0.25s linear,
+    stroke 0.25s ease;
+}
+
 .timer-progress-green .timer-progress-value {
   stroke: #36a853;
 }

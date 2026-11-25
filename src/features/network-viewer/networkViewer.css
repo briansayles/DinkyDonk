@@ -73,6 +73,7 @@ body {
   top: 65%;
   grid-template-columns: minmax(0, 1fr);
   font-size: clamp(1.6rem, min(10cqi, 6vh), 4rem);
+  overflow: hidden;
   overflow-wrap: anywhere;
   transform: translateX(-50%);
 }

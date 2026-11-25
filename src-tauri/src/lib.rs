@@ -247,11 +247,11 @@ struct AppData {
 
 fn default_tournament_structure() -> Tournament {
     let levels = [
+        (1.0, 2.0),
         (2.0, 4.0),
         (3.0, 6.0),
         (4.0, 8.0),
         (5.0, 10.0),
-        (6.0, 12.0),
         (8.0, 16.0),
         (10.0, 20.0),
         (15.0, 30.0),
@@ -259,15 +259,13 @@ fn default_tournament_structure() -> Tournament {
         (30.0, 60.0),
         (40.0, 80.0),
         (50.0, 100.0),
-        (60.0, 120.0),
-        (80.0, 160.0),
+        (75.0, 150.0),
         (100.0, 200.0),
         (150.0, 300.0),
         (200.0, 400.0),
         (300.0, 600.0),
         (400.0, 800.0),
         (500.0, 1000.0),
-        (600.0, 1200.0),
         (800.0, 1600.0),
         (1000.0, 2000.0),
         (1500.0, 3000.0),
@@ -275,7 +273,6 @@ fn default_tournament_structure() -> Tournament {
         (3000.0, 6000.0),
         (4000.0, 8000.0),
         (5000.0, 10000.0),
-        (6000.0, 12000.0),
         (8000.0, 16000.0),
     ]
     .into_iter()
@@ -395,32 +392,57 @@ fn get_default_tournament_structure() -> Tournament {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TimerSettings {
+    
+    #[serde(default = "default_alarm_sound")]
     alarm_sound: String,
+    #[serde(default = "default_volume")]
     volume: f64,
+    #[serde(default = "default_spoken_announcement_enabled")]
     spoken_announcement_enabled: bool,
     #[serde(default = "default_announcement_speed")]
     announcement_speed: f64,
+    #[serde(default = "default_announcement")]
     announcement: String,
     #[serde(default = "default_countdown_warning_seconds")]
     countdown_warning_seconds: u32,
     #[serde(default = "default_countdown_warning_sound")]
     countdown_warning_sound: String,
-    #[serde(default)]
+    #[serde(default = "default_countdown_warning_speech_enabled")]
     countdown_warning_speech_enabled: bool,
     #[serde(default = "default_countdown_warning_announcement")]
     countdown_warning_announcement: String,
 }
 
-fn default_announcement_speed() -> f64 {
+fn default_alarm_sound() -> String {
+    "Hockey goal horn".to_string()
+}
+
+fn default_volume() -> f64 {
     1.0
 }
 
+fn default_spoken_announcement_enabled() -> bool {
+    true
+}
+
+fn default_announcement_speed() -> f64 {
+    1.2
+}
+
+fn default_announcement() -> String {
+    "The blinds are now {smallBlind} and {bigBlind}{antePhrase}".to_string()
+}
+
 fn default_countdown_warning_seconds() -> u32 {
-    10
+    60
 }
 
 fn default_countdown_warning_sound() -> String {
-    "single-ding".to_string()
+    "Ding ding ding".to_string()
+}
+
+fn default_countdown_warning_speech_enabled() -> bool {
+    true
 }
 
 fn default_countdown_warning_announcement() -> String {

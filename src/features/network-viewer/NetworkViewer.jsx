@@ -8,6 +8,9 @@ import { useTimer } from "../timer/useTimer";
 import { getViewerSummary } from "./viewerSummary";
 import { getViewerShareUrl } from "./viewerShare";
 
+const TIMER_ANCHOR_DRIFT_THRESHOLD_MS = 2_000;
+const VIEWER_SYNC_INTERVAL_MS = 1_000;
+
 export default function NetworkViewer() {
   const [tournament, setTournament] = useState(null);
   const [status, setStatus] = useState("Connecting to the desktop app...");
@@ -26,14 +29,39 @@ export default function NetworkViewer() {
         const snapshot = await response.json();
         if (!active) return;
         const now = Date.now();
-        setTournament(snapshot ? {
-          ...snapshot,
-          levels: sortLevels(snapshot.levels),
-          chips: sortChips(snapshot.chips),
-          timerElapsedMs: snapshot.elapsedMs,
-          timerIsRunning: snapshot.running,
-          timerStartedAt: snapshot.running ? now : null,
-        } : null);
+        setTournament((previous) => {
+          if (!snapshot) return null;
+
+          const previousElapsedMs =
+            previous?.timerIsRunning && previous.timerStartedAt !== null
+              ? previous.timerElapsedMs + now - previous.timerStartedAt
+              : null;
+          const shouldResetAnchor =
+            snapshot.running &&
+            (
+              !previous?.timerIsRunning ||
+              previous.id !== snapshot.id ||
+              previousElapsedMs === null ||
+              Math.abs(snapshot.elapsedMs - previousElapsedMs) >
+                TIMER_ANCHOR_DRIFT_THRESHOLD_MS
+            );
+
+          return {
+            ...snapshot,
+            levels: sortLevels(snapshot.levels),
+            chips: sortChips(snapshot.chips),
+            timerElapsedMs:
+              snapshot.running && !shouldResetAnchor
+                ? previous.timerElapsedMs
+                : snapshot.elapsedMs,
+            timerIsRunning: snapshot.running,
+            timerStartedAt: snapshot.running
+              ? shouldResetAnchor
+                ? now
+                : previous.timerStartedAt
+              : null,
+          };
+        });
         setStatus(snapshot ? "" : "No active tournament. Select one in the desktop app.");
       } catch (error) {
         if (active) {
@@ -42,7 +70,7 @@ export default function NetworkViewer() {
         }
       } finally {
         window.clearTimeout(requestTimeout);
-        if (active) timeout = window.setTimeout(synchronize, 1000);
+        if (active) timeout = window.setTimeout(synchronize, VIEWER_SYNC_INTERVAL_MS);
       }
     }
 

@@ -47,6 +47,13 @@ export const PAYOUT_ROUND_TO_TABLE = [
   { minPayout: Infinity, roundTo: 500 },
 ];
 
+function isFourOrSixScaledBlind(smallBlind) {
+  let value = Number(smallBlind);
+  if (!Number.isFinite(value) || value <= 0) return false;
+  while (value >= 10 && value % 10 === 0) value /= 10;
+  return value === 4 || value === 6;
+}
+
 export function createGuidedTournamentStructure(tournament, answers) {
   const { smallestChip, players, durationHours } = answers;
   const rawStartingStack = smallestChip * 400;
@@ -128,12 +135,30 @@ export function createGuidedTournamentStructure(tournament, answers) {
   let levels = getLevels(startingChipstack);
   let levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
   if (levelDuration < 10) {
+    const shortenedLevels = levels.filter(
+      (level) => level.isBreak || !isFourOrSixScaledBlind(level.smallBlind),
+    );
+    if (shortenedLevels.some((level) => !level.isBreak)) {
+      levels = shortenedLevels;
+      levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
+    }
+  }
+  if (levelDuration < 10) {
     if (!Number.isSafeInteger(startingChipstack / 2)) {
       throw new Error("The starting chipstack cannot be halved to a whole number. Choose a different smallest chip.");
     }
     startingChipstack /= 2;
     levels = getLevels(startingChipstack);
+    const shortenedLevels = levels.filter(
+      (level) => level.isBreak || !isFourOrSixScaledBlind(level.smallBlind),
+    );
+    if (shortenedLevels.some((level) => !level.isBreak)) {
+      levels = shortenedLevels;
+    }
     levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
+  }
+  if (levelDuration < 10 && levels.length > 1) {
+    levelDuration = Math.max(1, Math.round(totalMinutes / (levels.length - 1)));
   }
 
   return {
@@ -787,7 +812,7 @@ function hasLevelChange(levels, index, isLargeChange) {
     const ratio = currentValue / previousValue;
     return isLargeChange
       ? ratio > 1.5 
-      : ratio < 1.20 ;
+      : ratio >= 1 && ratio < 1.25;
   });
 }
 

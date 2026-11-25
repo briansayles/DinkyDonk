@@ -8,6 +8,7 @@ import {
 } from "../../domain/tournament";
 import { playTimerAlarm } from "./timerAudio";
 
+export const TIMER_UPDATE_INTERVAL_MS = 250;
 const MAX_TIMER_CHIPS = 4;
 
 export function useTimer({
@@ -156,7 +157,7 @@ export function useTimer({
 
   useEffect(() => {
     setClockNowMs(Date.now() + clockOffsetMs);
-  }, [activeTournament?.id, clockOffsetMs]);
+  }, [activeTournament?.id, clockOffsetMs, startedAt]);
 
   useEffect(() => {
     if (readOnly) return;
@@ -223,7 +224,7 @@ export function useTimer({
 
     const intervalId = window.setInterval(() => {
       setClockNowMs(Date.now() + clockOffsetMs);
-    }, 100);
+    }, TIMER_UPDATE_INTERVAL_MS);
     return () => window.clearInterval(intervalId);
   }, [startedAt, clockOffsetMs]);
 

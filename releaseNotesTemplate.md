@@ -1,17 +1,19 @@
 ## What's New
-- Added guided tournament creation mode. User enters smallest denomination chip, number of players, and desired time. Default tournament template and chips are adjusted and extended as necessary to accomodate. More work will be needed to fine-tune this feature.
+- 
 
 ## Windows
 
-**Download [DinkyDonk for Windows](https://github.com/briansayles/DinkyDonk/releases/download/DinkyDonk-v0.6.0/DinkyDonk_0.6.0_x64-setup.exe)**
+**Download [DinkyDonk for Windows](https://github.com/briansayles/DinkyDonk/releases/download/DinkyDonk-v0.#.0/DinkyDonk_0.#.0_x64-setup.exe)**
 
 DinkyDonk is not yet code-signed on Windows so it will likely show a warning when you open the app for the first time. 
 
 You will likely see a Windows Defender SmartScreen warning. Click "More info" → "Run anyway" to proceed.
 
+You will also likely see a message warning about network access. If you want to use the network functions, including viewing the timer screen in a browser and/or operating the tournament controls in a browser, you will need to allow incoming connections. It is strongly recommended that you ONLY enable this for private networks...never public networks!
+
 ## macOS
 
-**Download [DinkyDonk for macOS (Universal)](https://github.com/briansayles/DinkyDonk/releases/download/DinkyDonk-v0.6.0/DinkyDonk_0.6.0_universal.dmg)**
+**Download [DinkyDonk for macOS (Universal)](https://github.com/briansayles/DinkyDonk/releases/download/DinkyDonk-v0.#.0/DinkyDonk_0.#.0_universal.dmg)**
 
 DinkyDonk is not yet notarized by Apple on macOS, so it will likely block the app the first time you open it. You can allow it in one of two ways:
 
