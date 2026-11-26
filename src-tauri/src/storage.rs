@@ -416,6 +416,7 @@ mod tests {
             countdown_warning_sound: "single-ding".to_string(),
             countdown_warning_speech_enabled: false,
             countdown_warning_announcement: "{seconds} seconds remaining.".to_string(),
+            show_network_viewer_qr: true,
         }
     }
 

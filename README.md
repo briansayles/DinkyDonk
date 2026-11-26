@@ -113,7 +113,7 @@ With DinkyDonk running, select an active tournament and open **Settings → Loca
 
 In the tournament list, the active tournament has a green border. A tournament's globe button makes it active and opens the network viewer in the desktop's default browser.
 
-The network viewer displays a QR code that another device on the same network can scan to open the same address. Open the viewer using a network address, rather than localhost, to generate a shareable code.
+The network viewer displays a QR code that another device on the same network can scan to open the same address. Use **Settings → Local network timer viewer → Show QR code for browser-based timer** to hide or show it. Open the viewer using a network address, rather than localhost, to generate a shareable code.
 
 The viewer starts automatically and does not use a password or encryption. Anyone who can reach the computer and port can see the active tournament's name, blinds, chips, timer, and aggregate entry, prize and payout information. Individual participant records are not sent. Only use it on a trusted network; firewall rules determine which devices can connect. The viewer stops when the desktop app exits.
 

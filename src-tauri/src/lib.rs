@@ -411,6 +411,8 @@ struct TimerSettings {
     countdown_warning_speech_enabled: bool,
     #[serde(default = "default_countdown_warning_announcement")]
     countdown_warning_announcement: String,
+    #[serde(default = "default_show_network_viewer_qr")]
+    show_network_viewer_qr: bool,
 }
 
 fn default_alarm_sound() -> String {
@@ -447,6 +449,10 @@ fn default_countdown_warning_speech_enabled() -> bool {
 
 fn default_countdown_warning_announcement() -> String {
     "{seconds} seconds remaining.".to_string()
+}
+
+fn default_show_network_viewer_qr() -> bool {
+    true
 }
 
 #[cfg(test)]
@@ -975,7 +981,9 @@ mod tests {
         let saved = super::read_app_data_from_file(&path).unwrap();
         assert!(saved.tournaments.is_empty());
         assert!(saved.active_tournament_id.is_none());
-        assert_eq!(saved.timer_settings.unwrap().volume, 0.5);
+        let settings = saved.timer_settings.unwrap();
+        assert_eq!(settings.volume, 0.5);
+        assert!(settings.show_network_viewer_qr);
 
         let existing = super::default_tournament_data();
         let mut data = super::read_app_data_from_file(&path).unwrap();
@@ -1260,6 +1268,7 @@ mod tests {
                 countdown_warning_sound: "single-ding".to_string(),
                 countdown_warning_speech_enabled: false,
                 countdown_warning_announcement: "{seconds} seconds remaining.".to_string(),
+                show_network_viewer_qr: false,
             }),
         };
 
@@ -1277,7 +1286,9 @@ mod tests {
             loaded.active_tournament_id.as_deref(),
             Some(DEFAULT_TOURNAMENT_ID)
         );
-        assert_eq!(loaded.timer_settings.unwrap().volume, 0.5);
+        let settings = loaded.timer_settings.unwrap();
+        assert_eq!(settings.volume, 0.5);
+        assert!(!settings.show_network_viewer_qr);
     }
 
     #[test]

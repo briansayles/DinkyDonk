@@ -13,6 +13,7 @@ const VIEWER_SYNC_INTERVAL_MS = 1_000;
 
 export default function NetworkViewer() {
   const [tournament, setTournament] = useState(null);
+  const [showNetworkViewerQr, setShowNetworkViewerQr] = useState(false);
   const [status, setStatus] = useState("Connecting to the desktop app...");
 
   useEffect(() => {
@@ -26,8 +27,10 @@ export default function NetworkViewer() {
       try {
         const response = await fetch("/api/timer", { cache: "no-store", signal: controller.signal });
         if (!response.ok) throw new Error(`Server returned ${response.status}`);
-        const snapshot = await response.json();
+        const viewerSnapshot = await response.json();
         if (!active) return;
+        const snapshot = viewerSnapshot.tournament;
+        setShowNetworkViewerQr(viewerSnapshot.showNetworkViewerQr);
         const now = Date.now();
         setTournament((previous) => {
           if (!snapshot) return null;
@@ -107,7 +110,7 @@ export default function NetworkViewer() {
     averageChipstackMessage, summary?.averageChipstack ?? 0, timer.currentLevel,
   );
   const viewerUrl = getViewerShareUrl(window.location);
-  const viewerShare = !viewerUrl ? (
+  const viewerShare = !showNetworkViewerQr ? null : !viewerUrl ? (
     <p className="network-viewer-share-warning">
       Open the viewer using a network address to share it.
     </p>
@@ -162,7 +165,9 @@ export default function NetworkViewer() {
           </TimerPanel>
         </div>
       )}
-      {!tournament && <div className="network-viewer-share-empty">{viewerShare}</div>}
+      {!tournament && showNetworkViewerQr && (
+        <div className="network-viewer-share-empty">{viewerShare}</div>
+      )}
     </section>
   );
 }

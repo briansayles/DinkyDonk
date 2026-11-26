@@ -65,6 +65,13 @@ struct ViewerTournament {
     max_players_per_table: u32,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ViewerSnapshot {
+    tournament: Option<ViewerTournament>,
+    show_network_viewer_qr: bool,
+}
+
 #[tauri::command]
 pub fn get_network_viewer_status(status: State<'_, ViewerStatus>) -> ViewerConnection {
     let Some(port) = status.port else {
@@ -95,7 +102,7 @@ pub fn get_network_viewer_status(status: State<'_, ViewerStatus>) -> ViewerConne
     }
 }
 
-fn snapshot(app: &tauri::AppHandle) -> Result<Option<ViewerTournament>, String> {
+fn snapshot(app: &tauri::AppHandle) -> Result<ViewerSnapshot, String> {
     let persistence = app.state::<PersistenceLock>();
     let _guard = persistence
         .0
@@ -106,7 +113,20 @@ fn snapshot(app: &tauri::AppHandle) -> Result<Option<ViewerTournament>, String> 
         .duration_since(UNIX_EPOCH)
         .map_err(|error| format!("Could not read system clock: {error}"))?
         .as_millis() as f64;
-    Ok(viewer_snapshot(data, now))
+    Ok(viewer_response(data, now))
+}
+
+fn viewer_response(data: AppData, now: f64) -> ViewerSnapshot {
+    let show_network_viewer_qr = data
+        .timer_settings
+        .as_ref()
+        .map(|settings| settings.show_network_viewer_qr)
+        .unwrap_or(true);
+    let tournament = viewer_snapshot(data, now);
+    ViewerSnapshot {
+        tournament,
+        show_network_viewer_qr,
+    }
 }
 
 fn viewer_snapshot(data: AppData, now: f64) -> Option<ViewerTournament> {
@@ -469,7 +489,7 @@ fn handle_director_request(
 
 fn handle_request(
     request: tiny_http::Request,
-    load_snapshot: impl FnOnce() -> Result<Option<ViewerTournament>, String>,
+    load_snapshot: impl FnOnce() -> Result<ViewerSnapshot, String>,
     load_asset: impl FnOnce(&str) -> Option<Vec<u8>>,
 ) {
     let result = if request.method() != &Method::Get {
@@ -887,8 +907,18 @@ mod tests {
                 handle_request(
                     request,
                     || match index {
-                        6 => Ok(viewer_snapshot(fixture_data(), 13_000.0)),
-                        7 => Ok(None),
+                        6 => Ok(viewer_response(fixture_data(), 13_000.0)),
+                        7 => {
+                            let mut data = fixture_data();
+                            data.active_tournament_id = None;
+                            data.timer_settings = Some(
+                                serde_json::from_value(serde_json::json!({
+                                    "showNetworkViewerQr": false
+                                }))
+                                .unwrap(),
+                            );
+                            Ok(viewer_response(data, 13_000.0))
+                        }
                         _ => Err("private file path".to_string()),
                     },
                     |path| match path {
@@ -930,10 +960,12 @@ mod tests {
         let success = request(address, "GET", "/api/timer");
         assert!(success.starts_with("HTTP/1.1 200"));
         assert!(success.contains("\"name\":\"DinkyDonk Default Tournament\""));
+        assert!(success.contains("\"showNetworkViewerQr\":true"));
         assert!(!success.contains("buyins"));
         let empty = request(address, "GET", "/api/timer");
         assert!(empty.starts_with("HTTP/1.1 200"));
-        assert!(empty.ends_with("null"));
+        assert!(empty.contains("\"tournament\":null"));
+        assert!(empty.contains("\"showNetworkViewerQr\":false"));
         let error = request(address, "GET", "/api/timer");
         assert!(error.starts_with("HTTP/1.1 500"));
         assert!(!error.contains("private file path"));

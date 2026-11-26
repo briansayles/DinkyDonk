@@ -9,6 +9,7 @@ export const defaultTimerSettings = {
   countdownWarningAnnouncement: "{seconds} seconds remaining.",
   announcement:
     "The blinds are now {smallBlind} and {bigBlind}{antePhrase}.",
+  showNetworkViewerQr: true,
 };
 
 const alarmSoundOptions = [
@@ -65,5 +66,9 @@ export function normalizeTimerSettings(settings) {
       typeof settings?.announcement === "string"
         ? settings.announcement
         : defaultTimerSettings.announcement,
+    showNetworkViewerQr:
+      typeof settings?.showNetworkViewerQr === "boolean"
+        ? settings.showNetworkViewerQr
+        : defaultTimerSettings.showNetworkViewerQr,
   };
 }

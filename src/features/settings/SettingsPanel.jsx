@@ -13,7 +13,7 @@ function formatSettingsDirectory(directory) {
     : directory;
 }
 
-function NetworkViewerSettings() {
+function NetworkViewerSettings({ showNetworkViewerQr, setTimerSettings }) {
   const [connection, setConnection] = useState(null);
   const [error, setError] = useState("");
 
@@ -38,6 +38,22 @@ function NetworkViewerSettings() {
       <p>The read-only timer viewer starts automatically while DinkyDonk is open.
         Anyone who can reach this computer can view the active tournament's timer,
         chips, and aggregate entry and payout information; there is no password or encryption.</p>
+      <label className="settings-switch">
+        <span>Show QR code for browser-based timer</span>
+        <input
+          type="checkbox"
+          role="switch"
+          checked={showNetworkViewerQr}
+          onChange={(event) =>
+            setTimerSettings((current) => ({
+              ...current,
+              showNetworkViewerQr: event.target.checked,
+            }))
+          }
+          aria-label="Show QR code for browser-based timer"
+        />
+        <span className="settings-switch-track" aria-hidden="true" />
+      </label>
       {error ? <p className="storage-error" role="alert">{error}</p> : !connection ? (
         <p>Loading network addresses...</p>
       ) : connection.urls.length ? (
@@ -80,7 +96,10 @@ export default function SettingsPanel({
           Reload saved settings (discard unsaved changes)
         </button>
       )}
-      <NetworkViewerSettings />
+      <NetworkViewerSettings
+        showNetworkViewerQr={timerSettings.showNetworkViewerQr}
+        setTimerSettings={setTimerSettings}
+      />
       <section className="settings-section settings-directory-section" aria-labelledby="settings-directory-heading">
         <h3 id="settings-directory-heading">Local database</h3>
         <p>Tournaments and settings are stored on this device.</p>
