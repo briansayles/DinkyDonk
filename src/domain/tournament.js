@@ -158,7 +158,7 @@ export function createGuidedTournamentStructure(tournament, answers) {
     levelDuration = Math.max(1, Math.round(totalMinutes / levels.length));
   }
   if (levelDuration < 10 && levels.length > 1) {
-    levelDuration = Math.max(1, Math.round(totalMinutes / (levels.length - 1)));
+    levelDuration = Math.max(8, Math.round(totalMinutes / (levels.length - 1)));
   }
 
   return {
