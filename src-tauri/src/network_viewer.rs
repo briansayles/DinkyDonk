@@ -67,9 +67,23 @@ struct ViewerTournament {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ViewerAudioSettings {
+    alarm_sound: String,
+    spoken_announcement_enabled: bool,
+    announcement_speed: f64,
+    announcement: String,
+    countdown_warning_seconds: u32,
+    countdown_warning_sound: String,
+    countdown_warning_speech_enabled: bool,
+    countdown_warning_announcement: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ViewerSnapshot {
     tournament: Option<ViewerTournament>,
     show_network_viewer_qr: bool,
+    audio_settings: Option<ViewerAudioSettings>,
 }
 
 #[tauri::command]
@@ -122,10 +136,24 @@ fn viewer_response(data: AppData, now: f64) -> ViewerSnapshot {
         .as_ref()
         .map(|settings| settings.show_network_viewer_qr)
         .unwrap_or(true);
+    let audio_settings = data
+        .timer_settings
+        .as_ref()
+        .map(|settings| ViewerAudioSettings {
+            alarm_sound: settings.alarm_sound.clone(),
+            spoken_announcement_enabled: settings.spoken_announcement_enabled,
+            announcement_speed: settings.announcement_speed,
+            announcement: settings.announcement.clone(),
+            countdown_warning_seconds: settings.countdown_warning_seconds,
+            countdown_warning_sound: settings.countdown_warning_sound.clone(),
+            countdown_warning_speech_enabled: settings.countdown_warning_speech_enabled,
+            countdown_warning_announcement: settings.countdown_warning_announcement.clone(),
+        });
     let tournament = viewer_snapshot(data, now);
     ViewerSnapshot {
         tournament,
         show_network_viewer_qr,
+        audio_settings,
     }
 }
 
@@ -895,6 +923,28 @@ mod tests {
         let mut data = fixture_data();
         data.active_tournament_id = None;
         assert!(viewer_snapshot(data, 13_000.0).is_none());
+    }
+
+    #[test]
+    fn viewer_snapshot_includes_audio_configuration_without_desktop_volume() {
+        let mut data = fixture_data();
+        data.timer_settings = Some(
+            serde_json::from_value(serde_json::json!({
+                "alarmSound": "ship-horn",
+                "volume": 0.1,
+                "spokenAnnouncementEnabled": false,
+                "countdownWarningSeconds": 30,
+                "countdownWarningSound": "double-ding"
+            }))
+            .unwrap(),
+        );
+        let snapshot = serde_json::to_value(viewer_response(data, 13_000.0)).unwrap();
+        let audio = &snapshot["audioSettings"];
+        assert_eq!(audio["alarmSound"], "ship-horn");
+        assert_eq!(audio["spokenAnnouncementEnabled"], false);
+        assert_eq!(audio["countdownWarningSeconds"], 30);
+        assert_eq!(audio["countdownWarningSound"], "double-ding");
+        assert!(audio.get("volume").is_none());
     }
 
     #[test]

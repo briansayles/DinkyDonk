@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { formatChipNumber, formatCurrency, sortChips, sortLevels } from "../../domain/tournament";
-import { defaultTimerSettings } from "../settings/timerSettings";
+import { defaultTimerSettings, normalizeTimerSettings } from "../settings/timerSettings";
 import TimerPanel from "../timer/TimerPanel";
 import { getDisplayedTimerMessage, getTimerMessages } from "../timer/timerMessages";
 import { useTimer } from "../timer/useTimer";
@@ -15,6 +15,9 @@ export default function NetworkViewer() {
   const [tournament, setTournament] = useState(null);
   const [showNetworkViewerQr, setShowNetworkViewerQr] = useState(false);
   const [status, setStatus] = useState("Connecting to the desktop app...");
+  const [audioSettings, setAudioSettings] = useState(defaultTimerSettings);
+  const [volume, setVolume] = useState(defaultTimerSettings.volume);
+  const viewerTimerSettings = useMemo(() => ({ ...audioSettings, volume }), [audioSettings, volume]);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +34,7 @@ export default function NetworkViewer() {
         if (!active) return;
         const snapshot = viewerSnapshot.tournament;
         setShowNetworkViewerQr(viewerSnapshot.showNetworkViewerQr);
+        setAudioSettings(normalizeTimerSettings(viewerSnapshot.audioSettings));
         const now = Date.now();
         setTournament((previous) => {
           if (!snapshot) return null;
@@ -102,7 +106,7 @@ export default function NetworkViewer() {
     activeTab: "Timer",
     activeTournament: tournament,
     timerMessages: messages,
-    timerSettings: defaultTimerSettings,
+    timerSettings: viewerTimerSettings,
     readOnly: true,
   });
   const message = getDisplayedTimerMessage(
@@ -161,6 +165,26 @@ export default function NetworkViewer() {
                 <dt>Chips in play</dt><dd>{formatChipNumber(summary.totalChipsInPlay)}</dd>
                 <dt>Tables</dt><dd>{formatChipNumber(summary.tableCount)}</dd>
               </dl>
+            </div>
+            <div className="timer-bottom-center network-viewer-audio">
+              {!timer.viewerAudioEnabled && (
+                <button type="button" onClick={timer.enableViewerAudio}>Enable sound</button>
+              )}
+              {timer.viewerAudioEnabled && (
+                <label className="timer-volume-control">
+                  <span>Viewer volume</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={volume}
+                    onChange={(event) => setVolume(Number(event.target.value))}
+                    aria-label="Viewer volume"
+                  />
+                </label>
+              )}
+              {timer.viewerAudioError && <p role="alert">{timer.viewerAudioError}</p>}
             </div>
           </TimerPanel>
         </div>

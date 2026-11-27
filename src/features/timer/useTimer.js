@@ -26,11 +26,15 @@ export function useTimer({
   const [timerChips, setTimerChips] = useState([]);
   const [timerFullscreenError, setTimerFullscreenError] = useState("");
   const [timerIsFullscreen, setTimerIsFullscreen] = useState(false);
+  const [viewerAudioEnabled, setViewerAudioEnabled] = useState(false);
+  const [viewerAudioError, setViewerAudioError] = useState("");
   const timerChipsTargetRef = useRef([]);
   const timerPanelRef = useRef(null);
   const fullscreenExitInProgressRef = useRef(false);
   const fullscreenExitTimerRef = useRef(null);
   const audioContextRef = useRef(null);
+  const timerSettingsRef = useRef(timerSettings);
+  timerSettingsRef.current = timerSettings;
   const previousChipLevelRef = useRef(null);
   const previousLevelRef = useRef(null);
   const previousWarningLevelRef = useRef(null);
@@ -41,7 +45,9 @@ export function useTimer({
     ? (activeTournament?.timerStartedAt ?? null)
     : null;
 
-  const activeTournamentKey = activeTournament
+  const activeTournamentKey = readOnly
+    ? activeTournament?.id ?? ""
+    : activeTournament
     ? JSON.stringify({
         ...activeTournament,
         buyins: undefined,
@@ -160,7 +166,7 @@ export function useTimer({
   }, [activeTournament?.id, clockOffsetMs, startedAt]);
 
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly && !viewerAudioEnabled) return;
     const previousLevel = previousLevelRef.current;
     const nextLevelIndex = currentLevel?.index ?? null;
 
@@ -178,10 +184,10 @@ export function useTimer({
       tournamentKey: activeTournamentKey,
       levelIndex: nextLevelIndex,
     };
-  }, [activeTournamentKey, currentLevel?.index, startedAt, timerSettings, readOnly]);
+  }, [activeTournamentKey, currentLevel?.index, startedAt, timerSettings, readOnly, viewerAudioEnabled]);
 
   useEffect(() => {
-    if (readOnly) return;
+    if (readOnly && !viewerAudioEnabled) return;
     const levelKey =
       activeTournament?.id && currentLevel
         ? `${activeTournament.id}:${currentLevel.index}`
@@ -215,6 +221,7 @@ export function useTimer({
     startedAt,
     timerSettings.countdownWarningSeconds,
     readOnly,
+    viewerAudioEnabled,
   ]);
 
   useEffect(() => {
@@ -360,7 +367,27 @@ export function useTimer({
     }
   }
 
+  async function enableViewerAudio() {
+    setViewerAudioError("");
+    try {
+      if (!window.AudioContext) {
+        throw new Error("The Web Audio API is not available.");
+      }
+      const audioContext = audioContextRef.current ?? new window.AudioContext();
+      audioContextRef.current = audioContext;
+      if (audioContext.state === "suspended") await audioContext.resume();
+      if (audioContext.state !== "running") {
+        throw new Error(`Audio context is ${audioContext.state}.`);
+      }
+      setViewerAudioEnabled(true);
+    } catch (error) {
+      console.error("Could not enable viewer audio.", error);
+      setViewerAudioError("Could not enable sound. Check your browser audio settings and try again.");
+    }
+  }
+
   function speakLevelAnnouncement(level) {
+    const timerSettings = timerSettingsRef.current;
     if (!timerSettings.spokenAnnouncementEnabled) {
       return;
     }
@@ -371,9 +398,10 @@ export function useTimer({
     }
 
     if (level.isBreak) {
-      window.speechSynthesis.speak(
-        new window.SpeechSynthesisUtterance("Break."),
-      );
+      const announcement = new window.SpeechSynthesisUtterance("Break.");
+      announcement.volume = timerSettings.volume;
+      announcement.rate = timerSettings.announcementSpeed;
+      window.speechSynthesis.speak(announcement);
       return;
     }
 
@@ -404,6 +432,7 @@ export function useTimer({
   }
 
   function speakCountdownWarning() {
+    const timerSettings = timerSettingsRef.current;
     if (!timerSettings.countdownWarningSpeechEnabled) {
       return;
     }
@@ -680,6 +709,7 @@ export function useTimer({
     activeTimerMessage: timerMessages[activeTimerMessageIndex],
     currentLevel,
     elapsedMs,
+    enableViewerAudio,
     enterTimerFullscreen,
     finishTimerChipAnimation,
     hourProgress,
@@ -701,5 +731,7 @@ export function useTimer({
     toggleTimer,
     toggleTimerFullscreen,
     totalDurationMs,
+    viewerAudioEnabled,
+    viewerAudioError,
   };
 }

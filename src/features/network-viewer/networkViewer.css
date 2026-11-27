@@ -22,7 +22,8 @@ body {
 }
 
 .network-viewer-summary {
-  --network-viewer-row-gap: 1.5rem;
+  --network-viewer-row-gap: clamp(0.4rem, 1.5vh, 1.5rem);
+  container-type: inline-size;
   min-height: max-content;
   gap: var(--network-viewer-row-gap);
   overflow-y: visible;
@@ -31,6 +32,24 @@ body {
 
 .network-viewer .timer-display {
   container-type: inline-size;
+}
+
+.network-viewer-audio {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.network-viewer-audio p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.network-viewer-audio .timer-volume-control {
+  margin-left: 0;
 }
 
 .network-viewer-share {
@@ -86,7 +105,17 @@ body {
 
 @media (min-width: 701px) {
   .network-viewer .timer-display {
-    grid-template-rows: auto auto minmax(0, 1fr) var(--timer-control-height);
+    grid-template-areas:
+      "current current current"
+      "left-chips next right-middle"
+      "left-chips clock right-middle"
+      "left-chips bottom audio";
+    grid-template-rows: auto auto minmax(0, 1fr) minmax(var(--timer-control-height), auto);
+  }
+
+  .network-viewer-audio {
+    grid-area: audio;
+    align-self: end;
   }
 
   .network-viewer-summary {
@@ -108,7 +137,8 @@ body {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--network-viewer-row-gap) 0.4rem;
   margin: 0;
-  font-size: clamp(1.4rem, 3.2vh, 2rem);
+  font-size: clamp(0.75rem, min(3.2vh, 6cqi), 2rem);
+  line-height: 1.15;
 }
 
 .network-viewer-summary dd {
@@ -126,9 +156,10 @@ body {
     grid-template-areas:
       "current current"
       "next next"
-      "clock clock";
+      "clock clock"
+      "bottom bottom";
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(9rem, 1fr);
+    grid-template-rows: auto auto minmax(9rem, 1fr) auto;
   }
 
   .network-viewer .timer-message {

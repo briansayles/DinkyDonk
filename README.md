@@ -109,7 +109,7 @@ The database is created in the operating system's local app-data directory; its 
 
 ### Viewing the timer on the local network
 
-With DinkyDonk running, select an active tournament and open **Settings → Local network timer viewer**. On a device connected to the same IPv4 network, open one of the displayed HTTP addresses in a browser. The browser view is read-only and updates automatically; controls and alarms remain on the desktop app. The computer's firewall may need to allow incoming connections. Refresh the displayed addresses if the network changes; the port can change each time the app starts.
+With DinkyDonk running, select an active tournament and open **Settings → Local network timer viewer**. On a device connected to the same IPv4 network, open one of the displayed HTTP addresses in a browser. The browser view is read-only and updates automatically. Select **Enable sound** in each viewer to play the desktop's configured alarms and announcements; browsers require this interaction before audio can play. Each viewer's volume slider affects only that viewer and resets on reload. Browser and device speech support can vary. The computer's firewall may need to allow incoming connections. Refresh the displayed addresses if the network changes; the port can change each time the app starts.
 
 In the tournament list, the active tournament has a green border. A tournament's globe button makes it active and opens the network viewer in the desktop's default browser.
 
