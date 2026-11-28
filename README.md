@@ -28,13 +28,20 @@
   4. Average duration per level
   5. Aggressiveness, defined as average percent big blind increase per minute, and
   6. Aggressiveness evaluation: Slow, Balanced or Fast
+
+- **Local network timer viewer:** Open the active tournament's live timer in a browser on another device, without installing the desktop app on that device. Display the timer on as many screens as you want. Players can even open it on their phones if they're connected to the local network. Many timers can be open simultaneously without degrading performance.
+
+- **Local tournament director:** Control the active tournament from a browser on the same network.
+
 - **Alarms and announcements:** Configure level-change and countdown-warning sounds, spoken announcements, volume, and speech speed
+
 - **Your Data is Private:** All settings and tournament data are stored in a SQLite database on your local machine, meaning:
   1. The program does not need an internet connection to run,
   2. The program is not dependent on a remote server/database
   3. Your data is yours and yours alone...nothing gets shared outside of your control
   4. There is nothing you need to log into
   5. The read-only network viewer can display the timer on other devices without sharing the database file.
+
 - **Tournament Timer / Manager:** 
   1. Run timed blind levels and breaks (play/pause, restart level, jump back/forward a level, and reset controls on screen),
   2. Shows current and upcoming blinds that are nicely animated when they change,
@@ -53,23 +60,31 @@
       - The text color changes simultaneously using a calculated complimentary color
   8. When the timer is paused, the background color is set to grey and a 'timer paused' banner is displayed over the current blinds
   9. When the timer is running, the screen will be kept awake (good luck with that using any web-based tool on an Apple device!)
-- **Buyin Management** The timer screen is your place for entering buyins, rebuys, addons, and other prize pool or chips in play additions, all via simple spinner controls
+
+- **Buyin Management** The timer screen is your place for entering buyins, rebuys, addons, and other prize pool or chips in play additions, all via simple spinner controls...or use the network-accessible tournament director's dashboard
+
 - **Payouts Management** The paytable is automatically created based on your entries in the structure editor:
   1. Percent of players to be paid, and
   2. Paytable shape (flat, balanced or top heavy)
-If the paytable is allowed to be over-ridden, it can be edited on the timer screen via spinners for number to be paid and for each place's payout
-- **Bustouts Management** Use the bustouts spinner on the timer screen to record bustouts
+If the paytable is allowed to be over-ridden, it can be edited on the timer screen via spinners for number to be paid and for each place's payout, or via the network-accessible tournament director's dashboard
+
+- **Bustouts Management** Use the bustouts spinner on the timer screen to record bustouts, or use the network-accessible tournament director's dashboard
+
 - **Tables Management** The program doesn't currently support tracking players individually, so table/seat assignments aren't feasible, but the program does show the number of tables needed with x players and x-1 players in order to be balanced, given the maximum players per table entered on the timer screen
+
 - **Tournament Tracking:** All entries and bustouts are timestamped and recorded with pertinent details such as the elapsed tournament time and blinds at the time of bustout
+
 - **CSV export:** Use **Export CSVs** on a tournament structure to create separate structure and results files that can be imported into 3rd party programs or services
+
 - **Updates:** At startup, the app checks GitHub for a newer published release.
-- **Local network timer viewer:** Open the active tournament's live timer in a browser on another device, without installing the desktop app on that device.
-- **Local tournament director:** Control the active tournament from a browser on the same network.
+
 
 ## Screenshots
 
 <p>
     <img src="public/Screenshot Timer 1.png" alt="Screenshot Timer 1" width="220">
+    <img src="public/Screenshot Network Timer 1.jpeg" alt="Screenshot Timer 1" width="220">
+    <img src="public/Screenshot Network Director Phone View.png" alt="Screenshot Timer 1" height="140">
     <img src="public/Screenshot Timer 2.png" alt="Screenshot Timer 2" width="220">
     <img src="public/Screenshot Timer 3.png" alt="Screenshot Timer 3" width="220">
     <img src="public/Screenshot Timer 4.png" alt="Screenshot Timer 4" width="220">
@@ -119,7 +134,7 @@ The viewer starts automatically and does not use a password or encryption. Anyon
 
 ### Controlling the tournament on the local network
 
-Append `/td` to a displayed network address (for example, `http://192.168.1.10:60884/td`) to open the tournament director. It controls the active tournament's timer, entries, bustouts, tables, payouts, and alarm volume. Changes use the same local database and stale edits are rejected; review the refreshed data and retry if a conflict is reported. Timer alarms continue to play on the desktop.
+Append `/td` to a displayed network address (for example, `http://192.168.1.10:60884/td`) to open the tournament director. It controls the active tournament's timer, entries, bustouts, tables, payouts, and alarm volume. The compact dashboard keeps sections on screen; scroll within a section to see additional details.
 
 Use the count spinner buttons (or arrow keys) to adjust buy-ins and bustouts; direct typing is disabled for those counts.
 

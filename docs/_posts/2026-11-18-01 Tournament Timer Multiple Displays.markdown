@@ -1,6 +1,6 @@
 ---
 layout: default
-img: Screenshot Timer 3.png
+img: Screenshot Network Timer 1.png
 category: Features
 title: Tournament Timer - Multiple Displays
 description: |

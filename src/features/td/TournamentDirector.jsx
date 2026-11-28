@@ -249,14 +249,20 @@ export default function TournamentDirector() {
   const largeTables = tableCount ? summary.remainingPlayers % tableCount : 0;
   function collapseButton(section) {
     const closed = Boolean(collapsed[section]);
-    return <button type="button" aria-expanded={!closed} aria-label={`${closed ? "Expand" : "Collapse"} ${section}`}
+    return <button className="td-collapse" type="button" aria-expanded={!closed} aria-label={`${closed ? "Expand" : "Collapse"} ${section}`}
       onClick={() => setCollapsed((current) => ({ ...current, [section]: !closed }))}>
       {closed ? "Expand" : "Collapse"}
     </button>;
   }
 
   return <main className="td-page">
-    <header><h1>Tournament Director</h1><a href="/">View timer</a></header>
+    <header>
+      <div className="td-brand">
+        <img src="/dinkydonk_logo_transparent_edges.png" alt="" />
+        <h1>Tournament Director</h1>
+      </div>
+      <a href="/">View timer</a>
+    </header>
     {controls.storageError && <div>
       <p className="td-error" role="alert">{controls.storageError}</p>
       <button type="button" disabled={controls.saving} onClick={async () => {
@@ -272,59 +278,67 @@ export default function TournamentDirector() {
     {controls.loadingTournaments && <p>Connecting to the desktop app...</p>}
     {!controls.loadingTournaments && !tournament && <p>No active tournament. Select one in the desktop app.</p>}
     {tournament && <>
-      <h2>{tournament.name}</h2>
-      <section className="td-card">
+      <h2 title={tournament.name}>{tournament.name}</h2>
+      <section className="td-card td-timer">
         <h3>Timer</h3>
-        <p className="td-clock">{formatClock(timer.currentLevel?.remainingMs ?? 0)}</p>
-        <p>{timer.currentLevel ? (timer.currentLevel.level.isBreak ? "Break" : formatBlinds(
-          timer.currentLevel.level.smallBlind, timer.currentLevel.level.bigBlind, timer.currentLevel.level.ante,
-        )) : "No timed levels"}</p>
+        <div className="td-timer-display">
+          <p className="td-clock">{formatClock(timer.currentLevel?.remainingMs ?? 0)}</p>
+          <p>{timer.currentLevel ? (timer.currentLevel.level.isBreak ? "Break" : formatBlinds(
+            timer.currentLevel.level.smallBlind, timer.currentLevel.level.bigBlind, timer.currentLevel.level.ante,
+          )) : "No timed levels"}</p>
+        </div>
         <div className="td-transport">
           <button type="button" disabled={controls.saving} onClick={timer.resetTimer}>Reset</button>
           <button type="button" disabled={controls.saving} onClick={timer.jumpToPreviousLevel}>Previous level</button>
           <button type="button" disabled={controls.saving} onClick={timer.restartCurrentLevel}>Restart level</button>
-          <button type="button" disabled={controls.saving} onClick={timer.toggleTimer}>{tournament.timerIsRunning ? "Pause" : "Play"}</button>
           <button type="button" disabled={controls.saving} onClick={timer.jumpToNextLevel}>Next level</button>
+          <button type="button" disabled={controls.saving} onClick={timer.toggleTimer}>{tournament.timerIsRunning ? "Pause" : "Play"}</button>
         </div>
         <VolumeControl />
       </section>
       <div className="td-grid">
         <section className="td-card">
           <h3>Entries <span className="td-heading-actions"><button type="button" disabled={controls.saving} onClick={() => controls.resetEntryCounts(tournament)}>Reset</button>{collapseButton("entries")}</span></h3>
-          <div className="td-scroll"><table><thead><tr><th>Type</th><th>Count</th><th>Chips</th><th>Prize pool</th></tr></thead>
+          <div className="td-card-content td-scroll" tabIndex={0} role="region" aria-label="Entries details"><table className="td-entries-table"><thead><tr><th>Type</th><th>Count</th><th>Chips</th><th>Prize pool</th></tr></thead>
             {!collapsed.entries && <tbody>{entries.map((entry) => {
               const amounts = getEntryContributions(entry.count, entry.cost, entry.chips);
               return <tr key={entry.field}><th>{entry.label}</th><td>{field(entry.field, entry.count, { label: `${entry.label} count`, max: MAX_PARTICIPANT_COUNT, spinner: true, spinnerOnly: entry.field === "buyinCount" })}</td>
-                <td>{amounts.chipsInPlay.toLocaleString()}</td><td>{formatCurrency(amounts.contribution)}</td></tr>;
+                <td data-label="Chips">{amounts.chipsInPlay.toLocaleString()}</td><td data-label="Prize pool">{formatCurrency(amounts.contribution)}</td></tr>;
             })}
-            <tr><th>Other</th><td>—</td><td>{field("otherChipstack", tournament.otherChipstack, { label: "Other chips", step: "any" })}</td>
-              <td>{field("otherPrizePool", tournament.otherPrizePool, { label: "Other prize pool", step: "any" })}</td></tr></tbody>}
-            <tfoot><tr><th colSpan="2">Total</th><td>{summary.totalChipsInPlay.toLocaleString()}</td><td>{formatCurrency(summary.totalPrizePool)}</td></tr></tfoot>
+            <tr><th>Other</th><td>—</td><td data-label="Chips">{field("otherChipstack", tournament.otherChipstack, { label: "Other chips", step: "any" })}</td>
+              <td data-label="Prize pool">{field("otherPrizePool", tournament.otherPrizePool, { label: "Other prize pool", step: "any" })}</td></tr></tbody>}
+            <tfoot><tr><th colSpan="2">Total</th><td data-label="Chips">{summary.totalChipsInPlay.toLocaleString()}</td><td data-label="Prize pool">{formatCurrency(summary.totalPrizePool)}</td></tr></tfoot>
           </table></div>
         </section>
         <section className="td-card">
           <h3>Bustouts <button type="button" disabled={controls.saving} onClick={() => controls.resetBustoutCount(tournament)}>Reset</button></h3>
-          <div>Busted {field("bustoutCount", snapshot.bustoutCount, { label: "Bustouts count", max: Math.min(MAX_PARTICIPANT_COUNT, snapshot.buyinCount), spinner: true, spinnerOnly: true })}</div>
-          <p>Remaining: {summary.remainingPlayers.toLocaleString()}</p><p>Average chipstack: {summary.averageChipstack.toLocaleString()}</p>
+          <div className="td-card-content" tabIndex={0} role="region" aria-label="Bustouts details">
+            <div>Busted {field("bustoutCount", snapshot.bustoutCount, { label: "Bustouts count", max: Math.min(MAX_PARTICIPANT_COUNT, snapshot.buyinCount), spinner: true, spinnerOnly: true })}</div>
+            <p>Remaining: {summary.remainingPlayers.toLocaleString()}</p><p>Average chipstack: {summary.averageChipstack.toLocaleString()}</p>
+          </div>
         </section>
         <section className="td-card">
           <h3>Tables <span className="td-heading-actions"><button type="button" disabled={controls.saving} onClick={() => controls.resetTables(tournament)}>Reset</button>{collapseButton("tables")}</span></h3>
-          <div>Max per table {field("maxPlayersPerTable", maxPerTable, { label: "Maximum players per table", spinner: true })}</div>
-          <p>{tableCount.toLocaleString()} {tableCount === 1 ? "table" : "tables"}; {summary.remainingPlayers.toLocaleString()} players</p>
-          {!collapsed.tables && tableCount > 0 && <p>{largeTables > 0 && `${largeTables} of ${smallTable + 1}; `}{tableCount - largeTables} of {smallTable}</p>}
+          <div className="td-card-content" tabIndex={0} role="region" aria-label="Tables details">
+            <div>Max per table {field("maxPlayersPerTable", maxPerTable, { label: "Maximum players per table", spinner: true })}</div>
+            <p>{tableCount.toLocaleString()} {tableCount === 1 ? "table" : "tables"}; {summary.remainingPlayers.toLocaleString()} players</p>
+            {!collapsed.tables && tableCount > 0 && <p>{largeTables > 0 && `${largeTables} of ${smallTable + 1}; `}{tableCount - largeTables} of {smallTable}</p>}
+          </div>
         </section>
         <section className="td-card">
           <h3>Payouts <span className="td-heading-actions"><button type="button" disabled={controls.saving || !tournament.allowPayoutOverride} onClick={() => controls.resetPayouts(tournament)}>Reset</button>{collapseButton("payouts")}</span></h3>
-          <div>Players paid {field("payoutPlaces", tournament.payoutPlaces || summary.defaultPayoutPlaces, {
-            label: "Number of players paid", max: 1000, disabled: !tournament.allowPayoutOverride, spinner: true,
-          })}</div>
-          {!collapsed.payouts && <div className="td-payouts"><table><thead><tr><th>Place</th><th>Payout</th></tr></thead>
-            <tbody>{summary.payouts.map((payout, index) => <tr key={index}><th>{index + 1}</th><td>{field("payout", payout, {
-              label: `Payout for place ${index + 1}`, step: "any", index,
-              payoutPlaces: summary.effectivePayoutPlaces, calculatedPayouts: summary.payouts,
-              disabled: !tournament.allowPayoutOverride,
-            })}</td></tr>)}</tbody></table></div>}
-          <p>Total: {formatCurrency(summary.payouts.reduce((sum, payout) => sum + payout, 0))}</p>
+          <div className="td-card-content" tabIndex={0} role="region" aria-label="Payouts details">
+            <div>Players paid {field("payoutPlaces", tournament.payoutPlaces || summary.defaultPayoutPlaces, {
+              label: "Number of players paid", max: 1000, disabled: !tournament.allowPayoutOverride, spinner: true,
+            })}</div>
+            {!collapsed.payouts && <table><thead><tr><th>Place</th><th>Payout</th></tr></thead>
+              <tbody>{summary.payouts.map((payout, index) => <tr key={index}><th>{index + 1}</th><td>{field("payout", payout, {
+                label: `Payout for place ${index + 1}`, step: "any", index,
+                payoutPlaces: summary.effectivePayoutPlaces, calculatedPayouts: summary.payouts,
+                disabled: !tournament.allowPayoutOverride,
+              })}</td></tr>)}</tbody></table>}
+            <p>Total: {formatCurrency(summary.payouts.reduce((sum, payout) => sum + payout, 0))}</p>
+          </div>
         </section>
       </div>
     </>}
