@@ -16,4 +16,4 @@ Runs in full screen mode for a more professional look
 
 Background color and text color is continuously and gradually changing
 
-When running, the screen will be kept awake (good luck with that using any web-based tool on an Apple device!)
+When running, the screen will be kept awake so your timer won't just disappear during your tournament
